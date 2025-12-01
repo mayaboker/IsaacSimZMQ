@@ -116,17 +116,17 @@ class FrankaVisionMission(Mission):
             )
 
         # Set up async receive loops for all command channels
-        self.subscribe_to_protobuf_in_loop(
+        self.subscribe_to_autodetect_in_loop(
             self.camera_control_socket,
             server_control_message_pb2.ServerControlMessage,
             self.camera_control_sub_loop,
         )
-        self.subscribe_to_protobuf_in_loop(
+        self.subscribe_to_autodetect_in_loop(
             self.settings_socket,
             server_control_message_pb2.ServerControlMessage,
             self.settings_sub_loop,
         )
-        self.subscribe_to_protobuf_in_loop(
+        self.subscribe_to_autodetect_in_loop(
             self.franka_socket,
             server_control_message_pb2.ServerControlMessage,
             self.franka_sub_loop
@@ -158,7 +158,7 @@ class FrankaVisionMission(Mission):
     def stop_mission(self) -> None:
         asyncio.ensure_future(self.stop_mission_async())
 
-    def camera_control_sub_loop(self, proto_msg: server_control_message_pb2.ServerControlMessage) -> None:
+    def camera_control_sub_loop(self, proto_msg) -> None:
         """Handle camera control commands received.
 
         Processes camera mount joints velocities and focal length adjustments from the incoming message.
@@ -168,19 +168,27 @@ class FrankaVisionMission(Mission):
             proto_msg: ServerControlMessage containing a CameraControlCommand
         """
         new_velocities = (0, 0, 0)
-        if proto_msg.HasField("camera_control_command"):
+        focal_length = self.cur_focal_length
+        # Protobuf path
+        if hasattr(proto_msg, "HasField") and proto_msg.HasField("camera_control_command"):
             joints_vel = proto_msg.camera_control_command.joints_vel
             new_velocities = (joints_vel.x, joints_vel.y, joints_vel.z)
             focal_length = proto_msg.camera_control_command.focal_length
+        # MsgPack dict path
+        elif isinstance(proto_msg, dict) and "camera_control_command" in proto_msg:
+            c = proto_msg["camera_control_command"]
+            j = c.get("joints_vel", {})
+            new_velocities = (float(j.get("x", 0)), float(j.get("y", 0)), float(j.get("z", 0)))
+            focal_length = float(c.get("focal_length", self.cur_focal_length))
 
-            if focal_length != self.cur_focal_length:
-                try:
-                    focalLength_attr = self._camera_prim.GetAttribute("focalLength")
-                    focalLength_attr.Set(focal_length)
-                    self.cur_focal_length = focal_length
-                except:
-                    carb.log_warn(f"[{EXT_NAME}] Failed to set focal length")
-                    pass
+        if focal_length != self.cur_focal_length:
+            try:
+                focalLength_attr = self._camera_prim.GetAttribute("focalLength")
+                focalLength_attr.Set(focal_length)
+                self.cur_focal_length = focal_length
+            except:
+                carb.log_warn(f"[{EXT_NAME}] Failed to set focal length")
+                pass
 
         if self.world.is_playing():
             try:
@@ -192,20 +200,20 @@ class FrankaVisionMission(Mission):
                     )
                 )
             except:
-                print(traceback.format_exc())
-                print(new_velocities)
                 carb.log_warn(f"[{EXT_NAME}] unable to apply action to camera")
 
-    def settings_sub_loop(self, proto_msg: server_control_message_pb2.ServerControlMessage) -> None:
+    def settings_sub_loop(self, proto_msg) -> None:
         """General purpose control loop to tweak parameters of the simulator
 
         Args:
             proto_msg: ServerControlMessage containing a ControlCommand
         """
-        if proto_msg.HasField("settings_command"):
+        if hasattr(proto_msg, "HasField") and proto_msg.HasField("settings_command"):
             self.zmq_client.adaptive_rate = proto_msg.settings_command.adaptive_rate
+        elif isinstance(proto_msg, dict) and "settings_command" in proto_msg:
+            self.zmq_client.adaptive_rate = bool(proto_msg["settings_command"].get("adaptive_rate", self.zmq_client.adaptive_rate))
 
-    def franka_sub_loop(self, proto_msg: server_control_message_pb2.ServerControlMessage) -> None:
+    def franka_sub_loop(self, proto_msg) -> None:
         """Handle Franka robot commands received via ZMQ.
 
         Controls the Franka robot's end effector position using RMPFlow and
@@ -218,9 +226,17 @@ class FrankaVisionMission(Mission):
         new_effector_pos = [0, 0, 0]
         self.draw.clear_points()
 
-        if proto_msg.HasField("franka_command"):
+        if hasattr(proto_msg, "HasField") and proto_msg.HasField("franka_command"):
             effector_pos = proto_msg.franka_command.effector_pos
             new_effector_pos = [effector_pos.x, effector_pos.y, effector_pos.z]
+            show_marker = getattr(proto_msg.franka_command, "show_marker", False)
+        elif isinstance(proto_msg, dict) and "franka_command" in proto_msg:
+            c = proto_msg["franka_command"]
+            p = c.get("effector_pos", {})
+            new_effector_pos = [float(p.get("x", 0.0)), float(p.get("y", 0.0)), float(p.get("z", 0.0))]
+            show_marker = bool(c.get("show_marker", False))
+        else:
+            show_marker = False
 
         if self.world.is_playing():
             try:
@@ -233,7 +249,7 @@ class FrankaVisionMission(Mission):
                     target_end_effector_orientation=rot_gt,
                 )
                 self.franka_articulation_controller.apply_action(actions)
-                if proto_msg.franka_command.show_marker:
+                if show_marker:
                     self.draw.draw_points([new_effector_pos], [(0, 0, 1, 1)], [10])
             except Exception as e:
                 carb.log_warn(f"[{EXT_NAME}] Error applying action: {e}")

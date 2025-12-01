@@ -170,6 +170,40 @@ class ZMQServer:
         self.sending_threads[name] = (worker, stop_event)
         worker.start()
 
+    def publish_msgpack_in_loop(self, name: str, port: int, rate_hz: float, fn: callable) -> None:
+        """
+        Sends MsgPack messages from a socket in a loop at a specified rate.
+
+        fn should return a serializable Python object (dict) that will be msgpack.packb'ed.
+        """
+        try:
+            import msgpack  # type: ignore
+        except Exception:
+            print("[isaac-zmq-server] msgpack not available - cannot publish msgpack")
+            return
+
+        sock = self.get_push_socket(port)
+        stop_event = threading.Event()
+
+        def loop():
+            while not stop_event.is_set():
+                try:
+                    payload = fn()
+                    sock.send(msgpack.packb(payload, use_bin_type=True))
+                except zmq.Again:
+                    continue
+                except Exception as e:
+                    print(f"[isaac-zmq-server] Unable to send msgpack to socket: {e}")
+                    continue
+                time.sleep(1 / rate_hz)
+
+            sock.close()
+            del self.push_sockets[port]
+
+        worker = threading.Thread(target=loop)
+        self.sending_threads[name] = (worker, stop_event)
+        worker.start()
+
     def cleanup(self) -> None:
         """
         Stops and joins all receiving and sending threads.

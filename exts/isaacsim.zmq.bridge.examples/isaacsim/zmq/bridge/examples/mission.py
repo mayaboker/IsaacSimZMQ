@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import asyncio
+import os
 import time
 from pathlib import Path
 import zmq.asyncio
@@ -83,6 +84,57 @@ class Mission:
                 proto_msg = await self.zmq_client.receive_protobuf(socket, proto_class)
                 fn(proto_msg, *args, **kwargs)
             carb.log_info(f"[{socket}] Stopped listening for protobuf messages.")
+
+        asyncio.ensure_future(_async_executor())
+
+    def subscribe_to_autodetect_in_loop(
+        self, socket: zmq.asyncio.Socket, proto_class, fn: callable, *args, **kwargs
+    ) -> None:
+        """
+        Auto-detect incoming Protobuf or MsgPack on a control socket and invoke the given handler.
+        If MsgPack, a minimal dict with field names is provided to the handler instead of a proto.
+        """
+        try:
+            import msgpack  # type: ignore
+        except Exception:
+            msgpack = None
+
+        async def _async_executor() -> None:
+            while self.receive_commands:
+                try:
+                    data = await socket.recv()
+                except Exception as e:
+                    carb.log_warn(f"[{EXT_NAME}] control recv error: {e}")
+                    continue
+                # Try protobuf first
+                try:
+                    proto_msg = proto_class()
+                    proto_msg.ParseFromString(data)
+                    try:
+                        fn(proto_msg, *args, **kwargs)
+                    except Exception as e:
+                        carb.log_warn(f"[{EXT_NAME}] control handler (protobuf) error: {e}")
+                    continue
+                except Exception:
+                    pass
+
+                if not msgpack:
+                    carb.log_warn(f"[{EXT_NAME}] MsgPack not available; unable to decode control message")
+                    continue
+                try:
+                    obj = msgpack.unpackb(data, raw=False)
+                except Exception as e:
+                    carb.log_warn(f"[{EXT_NAME}] Failed to unpack MsgPack control message: {e}")
+                    continue
+
+                try:
+                    # For MsgPack, pass through normalized dict to handler if it expects dict
+                    fn(obj, *args, **kwargs)
+                except Exception as e:
+                    carb.log_warn(f"[{EXT_NAME}] control handler (msgpack) error: {e}")
+                    continue
+
+            carb.log_info(f"[{socket}] Stopped listening for control messages.")
 
         asyncio.ensure_future(_async_executor())
 

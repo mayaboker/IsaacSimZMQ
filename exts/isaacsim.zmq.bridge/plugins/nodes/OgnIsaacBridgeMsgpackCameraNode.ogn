@@ -1,0 +1,57 @@
+{
+    "OgnIsaacBridgeMsgpackCameraNode": {
+        "version": 1,
+        "uiName": "ZMQ MsgPack Camera Publisher",
+        "icon": "icons/isaac-sim.svg",
+        "description": [
+            "Publishes raw camera frames over ZMQ as a Gazebo-style MsgPack payload"
+        ],
+        "categories": ["function"],
+        "language": "c++",
+        "scheduling": "pure",
+        "inputs": {
+            "execIn": {
+                "type": "execution",
+                "description": "Trigger for publishing"
+            },
+            "ip": {
+                "type": "string",
+                "description": "ZMQ endpoint host",
+                "default": "localhost"
+            },
+            "port": {
+                "type": "uint",
+                "description": "ZMQ endpoint port",
+                "default": 5561
+            },
+            "topic": {
+                "type": "string",
+                "description": "MsgPack topic string",
+                "default": "camera/image"
+            },
+            "width": {
+                "type": "uint",
+                "description": "Image width in pixels"
+            },
+            "height": {
+                "type": "uint",
+                "description": "Image height in pixels"
+            },
+            "channels": {
+                "type": "uint",
+                "description": "Number of channels in incoming buffer (1,3,4)",
+                "default": 4
+            },
+            "bufferSizeColor": {
+                "type": "uint64",
+                "description": "Size in bytes of the color buffer"
+            },
+            "dataPtrColor": {
+                "type": "uint64",
+                "description": "Pointer to the raw color buffer (device or host)"
+            }
+        },
+        "outputs": {}
+    }
+}
+

@@ -22,6 +22,12 @@ from isaac_zmq_server.ui import App
 import client_stream_message_pb2
 import server_control_message_pb2
 
+try:
+    import msgpack  # type: ignore
+except Exception:
+    msgpack = None
+import os
+
 parser = argparse.ArgumentParser(description="Isaac Sim ZMQ Client Example")
 parser.add_argument("--port", type=int, default=5561, help="Port to subscribe data on")
 parser.add_argument("--subscribe_only", type=int, default=0, help="1 to only subscribe to data, 0 to publish and subscribe")
@@ -185,26 +191,46 @@ class FrankaVisionMission(App):
 
         # Set up senders for various commands (if not in receive-only mode)
         if not SUBSCRIBE_ONLY:
-            self.zmq_server.publish_protobuf_in_loop(
-                "camera_control_command",
-                self.ports["camera_control_command"],
-                self.hz,
-                self.camera_control_command,
-            )
+            use_msgpack = (os.getenv("ISAAC_ZMQ_SERIALIZATION", "").strip().lower() == "msgpack") and (msgpack is not None)
 
-            self.zmq_server.publish_protobuf_in_loop(
-                "settings",
-                self.ports["settings"],
-                self.hz,
-                self.settings_command,
-            )
-
-            self.zmq_server.publish_protobuf_in_loop(
-                "franka",
-                self.ports["franka"],
-                self.hz,
-                self.franka_command,
-            )
+            if use_msgpack:
+                self.zmq_server.publish_msgpack_in_loop(
+                    "camera_control_command",
+                    self.ports["camera_control_command"],
+                    self.hz,
+                    self.camera_control_command_msgpack,
+                )
+                self.zmq_server.publish_msgpack_in_loop(
+                    "settings",
+                    self.ports["settings"],
+                    self.hz,
+                    self.settings_command_msgpack,
+                )
+                self.zmq_server.publish_msgpack_in_loop(
+                    "franka",
+                    self.ports["franka"],
+                    self.hz,
+                    self.franka_command_msgpack,
+                )
+            else:
+                self.zmq_server.publish_protobuf_in_loop(
+                    "camera_control_command",
+                    self.ports["camera_control_command"],
+                    self.hz,
+                    self.camera_control_command,
+                )
+                self.zmq_server.publish_protobuf_in_loop(
+                    "settings",
+                    self.ports["settings"],
+                    self.hz,
+                    self.settings_command,
+                )
+                self.zmq_server.publish_protobuf_in_loop(
+                    "franka",
+                    self.ports["franka"],
+                    self.hz,
+                    self.franka_command,
+                )
 
     def proto_bbox_data_to_dict(self, bbox2d_data) -> dict:
         """
@@ -283,20 +309,59 @@ class FrankaVisionMission(App):
         if not self.debug_start_time:
             self.debug_start_time = time.monotonic()
 
-        client_stream = client_stream_message_pb2.ClientStreamMessage()
+        # Try protobuf first; if it fails, fall back to msgpack
+        used_msgpack = False
+        if not hasattr(self, "_decode_format_logged"):
+            self._decode_format_logged = False
+        try:
+            client_stream = client_stream_message_pb2.ClientStreamMessage()
+            client_stream.ParseFromString(message)
+            dt = client_stream.clock.sim_dt
+            sim_time = client_stream.clock.sim_time
+            timecode = client_stream.clock.sys_time
+            img_data = client_stream.color_image
+            depth_data = client_stream.depth_image
+            bbox2d_data = self.proto_bbox_data_to_dict(client_stream.bbox2d)
+            camera_data = self.proto_camera_data_to_dict(client_stream.camera)
+        except Exception:
+            if not msgpack:
+                print("[isaac-zmq-server] Neither protobuf parse succeeded nor msgpack is available.")
+                return
+            try:
+                obj = msgpack.unpackb(message, raw=False)
+                used_msgpack = True
+            except Exception:
+                print("[isaac-zmq-server] Failed to unpack message with msgpack.")
+                print(traceback.format_exc())
+                return
 
-        # Deserialize the message
-        client_stream.ParseFromString(message)
+            clk = obj.get("clock", {})
+            dt = float(clk.get("sim_dt", 0.0))
+            sim_time = float(clk.get("sim_time", 0.0))
+            timecode = float(clk.get("sys_time", 0.0))
 
-        dt = client_stream.clock.sim_dt
-        sim_time = client_stream.clock.sim_time
-        timecode = client_stream.clock.sys_time
+            img_data = obj.get("color_image", b"")
+            depth_data = obj.get("depth_image", b"")
 
-        img_data = client_stream.color_image  # bytes
-        depth_data = client_stream.depth_image  # bytes
+            bbox2d_data = obj.get("bbox2d", {"data": [], "info": {"bboxIds": [], "idToLabels": {}}})
 
-        bbox2d_data = self.proto_bbox_data_to_dict(client_stream.bbox2d)
-        camera_data = self.proto_camera_data_to_dict(client_stream.camera)
+            cam = obj.get("camera", {})
+            # Normalize camera dict to expected shapes
+            view_flat = cam.get("view_matrix_ros", [])
+            intr_flat = cam.get("intrinsics_matrix", [])
+            scale_list = cam.get("camera_scale", [])
+
+            view_matrix_list = [view_flat[i : i + 4] for i in range(0, 16, 4)] if len(view_flat) == 16 else []
+            intrinsics_list = [intr_flat[i : i + 3] for i in range(0, 9, 3)] if len(intr_flat) == 9 else []
+            camera_data = {
+                "view_matrix_ros": view_matrix_list,
+                "camera_scale": list(scale_list),
+                "intrinsics_matrix": intrinsics_list,
+            }
+
+        if not self._decode_format_logged:
+            print(f"[isaac-zmq-server] Decode path: {'msgpack' if used_msgpack else 'protobuf'}")
+            self._decode_format_logged = True
 
         self.rates_debug(sim_time, timecode)
 
@@ -447,6 +512,49 @@ class FrankaVisionMission(App):
             message.franka_command.show_marker = False
 
         return message
+
+    def camera_control_command_msgpack(self) -> dict:
+        factor = np.interp(dpg.get_value("zoom"), self.camera_range, [0.3, 1.2])
+        command_x = self.current_camera_command[0] * factor
+        command_y = self.current_camera_command[1] * factor
+        command_z = self.current_camera_command[2] * factor
+
+        def smooth_step(current: float, target: float, min_step=0.5, max_step=4, smoothness=0.1):
+            diff = abs(target - current)
+            factor = 1 / (1 + math.exp(-diff / smoothness))
+            step = min_step + (max_step - min_step) * factor
+            return step
+
+        target_zoom = dpg.get_value("zoom")
+        if self.current_camera_f != target_zoom:
+            step = smooth_step(self.current_camera_f, target_zoom)
+            if self.current_camera_f < target_zoom:
+                self.current_camera_f = min(self.current_camera_f + step, target_zoom)
+            else:
+                self.current_camera_f = max(self.current_camera_f - step, target_zoom)
+
+        return {
+            "camera_control_command": {
+                "joints_vel": {"x": float(command_x), "y": float(command_y), "z": float(command_z)},
+                "focal_length": float(self.current_camera_f),
+            }
+        }
+
+    def settings_command_msgpack(self) -> dict:
+        return {
+            "settings_command": {
+                "adaptive_rate": bool(dpg.get_value("adeptive_rate")),
+            }
+        }
+
+    def franka_command_msgpack(self) -> dict:
+        pos = self.camera_to_world.detection_world_pos
+        return {
+            "franka_command": {
+                "effector_pos": {"x": float(pos[0]), "y": float(pos[1]), "z": float(pos[2])},
+                "show_marker": bool(dpg.get_value("draw_detection_on_world")),
+            }
+        }
 
     def mouse_wheel_evnet(self, sender: int, app_data: int) -> None:
         new_value = dpg.get_value("zoom") + (app_data * 5)

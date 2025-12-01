@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import asyncio
+import os
 import time
 import traceback
 
@@ -19,6 +20,11 @@ from omni.replicator.core.scripts.utils import viewport_manager
 from omni.syntheticdata import SyntheticData
 
 from .. import EXT_NAME
+
+try:
+    import msgpack  # type: ignore
+except Exception:
+    msgpack = None
 
 # The omni.__proto__ namespace is created by this extention
 # read more at core.proto_util.py
@@ -60,6 +66,15 @@ class ZMQAnnotator:
         self.server_ip = server_ip
         self.port = port
         self.resolution = resolution
+
+        # Serialization format selection (protobuf by default).
+        env_fmt = os.getenv("ISAAC_ZMQ_SERIALIZATION", "").strip().lower()
+        self.serialization = env_fmt if env_fmt in ("protobuf", "msgpack") else "protobuf"
+        if self.serialization == "msgpack" and msgpack is None:
+            carb.log_warn(f"[{EXT_NAME}] msgpack requested but not available. Falling back to protobuf.")
+            self.serialization = "protobuf"
+        else:
+            print(f"[{EXT_NAME}] Using serialization: {self.serialization}")
 
         # Get stage and synthetic data interface
         self.stage = omni.usd.get_context().get_stage()
@@ -271,59 +286,118 @@ class ZMQAnnotator:
         start_time = time.monotonic()
         # https://docs.omniverse.nvidia.com/extensions/latest/ext_replicator/annotators_details.html#bounding-box-2d-tight
 
-        # Create protobuf message
-        client_stream = client_stream_message_pb2.ClientStreamMessage()
+        # Select serialization
+        use_msgpack = self.serialization == "msgpack"
+        if not use_msgpack:
+            # Create protobuf message
+            client_stream = client_stream_message_pb2.ClientStreamMessage()
 
         # Get bounding box data (performance intensive operation)
         bbox2d_data = self.bbox2d_annot.get_data()
 
         # Fill BBox2D information
-        bbox2d_info = client_stream_message_pb2.BBox2DInfo()
-        bbox2d_info.bboxIds.extend(bbox2d_data["info"]["bboxIds"].tolist())
-        for key, value in bbox2d_data["info"]["idToLabels"].items():
-            bbox2d_info.idToLabels[str(key)] = f"class:{next(iter(value.values()))}"
-        client_stream.bbox2d.info.CopyFrom(bbox2d_info)
+        if use_msgpack:
+            bbox_ids = bbox2d_data["info"]["bboxIds"].tolist()
+            id_to_labels = {}
+            for key, value in bbox2d_data["info"]["idToLabels"].items():
+                id_to_labels[str(key)] = f"class:{next(iter(value.values()))}"
+            bbox2d_info = {"bboxIds": bbox_ids, "idToLabels": id_to_labels}
+        else:
+            bbox2d_info = client_stream_message_pb2.BBox2DInfo()
+            bbox2d_info.bboxIds.extend(bbox2d_data["info"]["bboxIds"].tolist())
+            for key, value in bbox2d_data["info"]["idToLabels"].items():
+                bbox2d_info.idToLabels[str(key)] = f"class:{next(iter(value.values()))}"
+            client_stream.bbox2d.info.CopyFrom(bbox2d_info)
 
         # Fill BBox2D data
-        for data in bbox2d_data["data"]:
-            bbox2d_type = client_stream.bbox2d.data.add()
-            bbox2d_type.semanticId = data[0]
-            bbox2d_type.xMin = data[1]
-            bbox2d_type.yMin = data[2]
-            bbox2d_type.xMax = data[3]
-            bbox2d_type.yMax = data[4]
-            bbox2d_type.occlusionRatio = data[5]
+        if use_msgpack:
+            bbox2d_list = []
+            for data in bbox2d_data["data"]:
+                bbox2d_list.append(
+                    {
+                        "semanticId": int(data[0]),
+                        "xMin": float(data[1]),
+                        "yMin": float(data[2]),
+                        "xMax": float(data[3]),
+                        "yMax": float(data[4]),
+                        "occlusionRatio": float(data[5]),
+                    }
+                )
+        else:
+            for data in bbox2d_data["data"]:
+                bbox2d_type = client_stream.bbox2d.data.add()
+                bbox2d_type.semanticId = data[0]
+                bbox2d_type.xMin = data[1]
+                bbox2d_type.yMin = data[2]
+                bbox2d_type.xMax = data[3]
+                bbox2d_type.yMax = data[4]
+                bbox2d_type.occlusionRatio = data[5]
 
         # Fill Camera information
-        camera = client_stream_message_pb2.Camera()
         view_matrix = self.camera.get_view_matrix_ros()
-        camera.view_matrix_ros.extend(view_matrix.flatten().tolist())
+        view_list = view_matrix.flatten().tolist()
         try:
             intrinsics_matrix = self.camera.get_intrinsics_matrix()
-            camera.intrinsics_matrix.extend(intrinsics_matrix.flatten().tolist())
+            intr_list = intrinsics_matrix.flatten().tolist()
         except:
             # Camera.get_intrinsics_matrix() will throw exception for non pinhole cameras
-            # I this case, we will not stream camera data
             carb.log_verbose(traceback.format_exc())
-        camera.camera_scale.extend(self.camera_xform.get_world_scales()[0].tolist())
-        client_stream.camera.CopyFrom(camera)
+            intr_list = []
+        scale_list = self.camera_xform.get_world_scales()[0].tolist()
+        if use_msgpack:
+            camera_dict = {
+                "view_matrix_ros": view_list,
+                "intrinsics_matrix": intr_list,
+                "camera_scale": scale_list,
+            }
+        else:
+            camera = client_stream_message_pb2.Camera()
+            camera.view_matrix_ros.extend(view_list)
+            if intr_list:
+                camera.intrinsics_matrix.extend(intr_list)
+            camera.camera_scale.extend(scale_list)
+            client_stream.camera.CopyFrom(camera)
 
         # Fill Clock information
-        clock = client_stream_message_pb2.Clock()
-        clock.sim_dt = dt
-        clock.sys_dt = 0  # not simply accessible via python
-        clock.sim_time = sim_time
-        clock.sys_time = time.time()
-        client_stream.clock.CopyFrom(clock)
+        if use_msgpack:
+            clock_dict = {
+                "sim_dt": float(dt),
+                "sys_dt": 0.0,
+                "sim_time": float(sim_time),
+                "sys_time": float(time.time()),
+            }
+        else:
+            clock = client_stream_message_pb2.Clock()
+            clock.sim_dt = dt
+            clock.sys_dt = 0  # not simply accessible via python
+            clock.sim_time = sim_time
+            clock.sys_time = time.time()
+            client_stream.clock.CopyFrom(clock)
 
         # Fill RGB image data
-        client_stream.color_image = self.rgb_annot.get_data().tobytes()
+        color_bytes = self.rgb_annot.get_data().tobytes()
+        if not use_msgpack:
+            client_stream.color_image = color_bytes
 
         # Fill Depth image data
-        client_stream.depth_image = self.distance_to_camera_annot.get_data().tobytes()
+        depth_bytes = self.distance_to_camera_annot.get_data().tobytes()
+        if not use_msgpack:
+            client_stream.depth_image = depth_bytes
 
         # Serialize and send the message
-        message = client_stream.SerializeToString()
+        if use_msgpack:
+            message = msgpack.packb(
+                {
+                    "bbox2d": {"data": bbox2d_list, "info": bbox2d_info},
+                    "camera": camera_dict,
+                    "clock": clock_dict,
+                    "color_image": color_bytes,
+                    "depth_image": depth_bytes,
+                },
+                use_bin_type=True,
+            )
+        else:
+            message = client_stream.SerializeToString()
 
         # send message with error throttling if not connected to a server
         async def graceful_send():

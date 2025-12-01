@@ -9,3 +9,8 @@ target = "../_build/target-deps/pip_prebundle"
 platforms = ["*-x86_64"]
 download_only = false
 append_to_install_folder = true
+
+[[dependency]]
+python = "../_build/target-deps/python"
+packages = ["msgpack==1.0.8"]
+target = "../_build/target-deps/pip_prebundle/msgpack"
