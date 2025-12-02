@@ -313,7 +313,7 @@ class FrankaVisionMission(App):
         used_msgpack = False
         if not hasattr(self, "_decode_format_logged"):
             self._decode_format_logged = False
-        
+
         # Try protobuf first
         protobuf_valid = False
         try:
@@ -331,7 +331,7 @@ class FrankaVisionMission(App):
                 camera_data = self.proto_camera_data_to_dict(client_stream.camera)
         except Exception:
             pass
-        
+
         # If protobuf didn't give valid data, try msgpack
         if not protobuf_valid:
             if not msgpack:

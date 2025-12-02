@@ -11,6 +11,18 @@
 #include <cuda/include/cuda_runtime_api.h>
 #include <zmq.hpp>
 
+// Check for msgpack availability at compile time
+#if defined(__has_include)
+#  if __has_include(<msgpack.hpp>)
+#    include <msgpack.hpp>
+#    define ISAACSIM_HAVE_MSGPACK 1
+#  else
+#    define ISAACSIM_HAVE_MSGPACK 0
+#  endif
+#else
+#  define ISAACSIM_HAVE_MSGPACK 0
+#endif
+
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/vec3d.h>
 
@@ -235,13 +247,121 @@ bool OgnIsaacBridgeZMQNode::compute(OgnIsaacBridgeZMQNodeDatabase& db) {
 
     CUDA_CHECK(cudaStreamSynchronize(state.m_cudaStream));
 
-    // Add image data to Protobuf message
+    // Add image data to Protobuf message (used for both paths initially)
     message.set_color_image(data_ptr_color.get(), data_size_color);
     message.set_depth_image(reinterpret_cast<const char*>(data_ptr_depth.get()), data_size_depth);
 
-    // Serialize Protobuf message
+    // Detect runtime preference for serialization format
+    const char* ser_env = std::getenv("ISAAC_ZMQ_SERIALIZATION");
+    bool want_msgpack = false;
+    if (ser_env) {
+        std::string s(ser_env);
+        for (auto& c : s) c = static_cast<char>(::tolower(c));
+        want_msgpack = (s == "msgpack");
+    }
+
+    // Serialize message
     std::string serialized_message;
-    message.SerializeToString(&serialized_message);
+
+#if ISAACSIM_HAVE_MSGPACK
+    if (want_msgpack) {
+        try {
+            msgpack::sbuffer sbuf;
+            msgpack::packer<msgpack::sbuffer> pk(&sbuf);
+
+            // Pack a map with 5 keys: bbox2d, camera, clock, color_image, depth_image
+            pk.pack_map(5);
+
+            // bbox2d
+            pk.pack(std::string("bbox2d"));
+            pk.pack_map(2);
+            // bbox2d.info
+            pk.pack(std::string("info"));
+            pk.pack_map(2);
+            pk.pack(std::string("bboxIds"));
+            {
+                const auto& ids = message.bbox2d().info().bboxids();
+                pk.pack_array(ids.size());
+                for (int i = 0; i < ids.size(); ++i) pk.pack(ids.Get(i));
+            }
+            pk.pack(std::string("idToLabels"));
+            {
+                pk.pack_map(message.bbox2d().info().idtolabels_size());
+                for (const auto& kv : message.bbox2d().info().idtolabels()) {
+                    pk.pack(kv.first);
+                    pk.pack(kv.second);
+                }
+            }
+            // bbox2d.data
+            pk.pack(std::string("data"));
+            {
+                const auto& arr = message.bbox2d().data();
+                pk.pack_array(arr.size());
+                for (int i = 0; i < arr.size(); ++i) {
+                    const auto& b = arr.Get(i);
+                    pk.pack_map(6);
+                    pk.pack(std::string("semanticId")); pk.pack(b.semanticid());
+                    pk.pack(std::string("xMin")); pk.pack(b.xmin());
+                    pk.pack(std::string("yMin")); pk.pack(b.ymin());
+                    pk.pack(std::string("xMax")); pk.pack(b.xmax());
+                    pk.pack(std::string("yMax")); pk.pack(b.ymax());
+                    pk.pack(std::string("occlusionRatio")); pk.pack(b.occlusionratio());
+                }
+            }
+
+            // camera
+            pk.pack(std::string("camera"));
+            pk.pack_map(3);
+            pk.pack(std::string("view_matrix_ros"));
+            {
+                const auto& v = message.camera().view_matrix_ros();
+                pk.pack_array(v.size());
+                for (int i = 0; i < v.size(); ++i) pk.pack(v.Get(i));
+            }
+            pk.pack(std::string("intrinsics_matrix"));
+            {
+                const auto& v = message.camera().intrinsics_matrix();
+                pk.pack_array(v.size());
+                for (int i = 0; i < v.size(); ++i) pk.pack(v.Get(i));
+            }
+            pk.pack(std::string("camera_scale"));
+            {
+                const auto& v = message.camera().camera_scale();
+                pk.pack_array(v.size());
+                for (int i = 0; i < v.size(); ++i) pk.pack(v.Get(i));
+            }
+
+            // clock
+            pk.pack(std::string("clock"));
+            pk.pack_map(4);
+            pk.pack(std::string("sim_dt")); pk.pack(message.clock().sim_dt());
+            pk.pack(std::string("sys_dt")); pk.pack(message.clock().sys_dt());
+            pk.pack(std::string("sim_time")); pk.pack(message.clock().sim_time());
+            pk.pack(std::string("sys_time")); pk.pack(message.clock().sys_time());
+
+            // color_image
+            pk.pack(std::string("color_image"));
+            pk.pack_bin(static_cast<uint32_t>(data_size_color));
+            pk.pack_bin_body(reinterpret_cast<const char*>(data_ptr_color.get()), static_cast<uint32_t>(data_size_color));
+
+            // depth_image
+            pk.pack(std::string("depth_image"));
+            pk.pack_bin(static_cast<uint32_t>(data_size_depth));
+            pk.pack_bin_body(reinterpret_cast<const char*>(data_ptr_depth.get()), static_cast<uint32_t>(data_size_depth));
+
+            serialized_message.assign(sbuf.data(), sbuf.size());
+        } catch (const std::exception& e) {
+            CARB_LOG_WARN("MsgPack serialization failed, falling back to Protobuf: %s", e.what());
+            message.SerializeToString(&serialized_message);
+        }
+    } else
+#endif
+    {
+        if (want_msgpack) {
+            CARB_LOG_WARN("ISAAC_ZMQ_SERIALIZATION=msgpack set, but msgpack.hpp not found at build time. Using Protobuf.");
+        }
+        message.SerializeToString(&serialized_message);
+    }
 
     // ZMQ Data sending
     zmq_lib::message_t zmq_message(serialized_message.size());
