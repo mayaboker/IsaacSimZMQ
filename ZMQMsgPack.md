@@ -8,8 +8,8 @@ MsgPack ZMQ subscriber using the new `ZMQMsgpackAnnotator`:
 3. Drive the same flow in headless mode.
 
 The examples below assume you already built the project (`./build.sh`) and that
-`simple_msgpack_camera_gui.py` (or any other subscriber) is running to verify
-frames.
+a subscriber is running on the **server side** to verify frames. You can use
+`simple_msgpack_camera_gui.py` from the `isaac-zmq-server/src/` directory.
 
 ---
 
@@ -261,4 +261,3 @@ extensions whenever you need a Gazebo-style MsgPack feed from Isaac Sim.
 The `ZMQPoseSubscriber` enables bidirectional control, allowing external applications
 to command camera poses in Isaac Sim, making it ideal for closed-loop systems and
 hardware-in-the-loop testing.
-
