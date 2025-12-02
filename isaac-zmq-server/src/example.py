@@ -309,23 +309,33 @@ class FrankaVisionMission(App):
         if not self.debug_start_time:
             self.debug_start_time = time.monotonic()
 
-        # Try protobuf first; if it fails, fall back to msgpack
+        # Try to detect format: protobuf or msgpack
         used_msgpack = False
         if not hasattr(self, "_decode_format_logged"):
             self._decode_format_logged = False
+        
+        # Try protobuf first
+        protobuf_valid = False
         try:
             client_stream = client_stream_message_pb2.ClientStreamMessage()
             client_stream.ParseFromString(message)
-            dt = client_stream.clock.sim_dt
-            sim_time = client_stream.clock.sim_time
-            timecode = client_stream.clock.sys_time
             img_data = client_stream.color_image
-            depth_data = client_stream.depth_image
-            bbox2d_data = self.proto_bbox_data_to_dict(client_stream.bbox2d)
-            camera_data = self.proto_camera_data_to_dict(client_stream.camera)
+            # Check if we got valid data - if image is empty but message isn't, it's likely msgpack
+            if len(img_data) > 0 or len(message) < 100:
+                protobuf_valid = True
+                dt = client_stream.clock.sim_dt
+                sim_time = client_stream.clock.sim_time
+                timecode = client_stream.clock.sys_time
+                depth_data = client_stream.depth_image
+                bbox2d_data = self.proto_bbox_data_to_dict(client_stream.bbox2d)
+                camera_data = self.proto_camera_data_to_dict(client_stream.camera)
         except Exception:
+            pass
+        
+        # If protobuf didn't give valid data, try msgpack
+        if not protobuf_valid:
             if not msgpack:
-                print("[isaac-zmq-server] Neither protobuf parse succeeded nor msgpack is available.")
+                print("[isaac-zmq-server] Protobuf parse gave empty data and msgpack is not available.")
                 return
             try:
                 obj = msgpack.unpackb(message, raw=False)
