@@ -32,7 +32,8 @@ RUN pip install \
     dearpygui \
     pyzmq==26.4.0 \
     opencv-python \
-    protobuf==5.26.0
+    protobuf==5.26.0 \
+    msgpack==1.0.8
 
 # Set the working directory for the application
 WORKDIR /isaac-zmq-server/src
