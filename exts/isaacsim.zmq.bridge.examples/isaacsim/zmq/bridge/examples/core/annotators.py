@@ -216,6 +216,9 @@ class ZMQAnnotator:
             }
         for an, _params in annot_var_mapping.items():
             ptr_node = self.graph.get_node(_graph_path + _params["node_name"])
+            if not ptr_node or not ptr_node.is_valid():
+                carb.log_warn(f"[{EXT_NAME}] Annotator node not found: {_params['node_name']}. Skipping connection.")
+                continue
             ptr_node.get_attribute("outputs:exec").connect(sync_node.get_attribute("inputs:execIn"), True)
             for p in _params["attrs"]:
                 target_attr = zmq_.get_attribute(f"inputs:{p}{_params['attr_suffix']}")

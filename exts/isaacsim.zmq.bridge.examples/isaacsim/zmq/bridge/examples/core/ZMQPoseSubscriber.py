@@ -240,4 +240,3 @@ class ZMQPoseSubscriber:
             self._sock.close()
         except Exception:
             pass
-

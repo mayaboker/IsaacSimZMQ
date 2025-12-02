@@ -93,4 +93,3 @@ def periodic_check(event):
 
 # Subscribe to update events for periodic checking
 check_subscription = app.get_update_event_stream().create_subscription_to_pop(periodic_check)
-

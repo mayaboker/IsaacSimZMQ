@@ -60,4 +60,3 @@ class ZMQMsgpackAnnotator:
         except Exception:
             pass
         self._sock.close()
-

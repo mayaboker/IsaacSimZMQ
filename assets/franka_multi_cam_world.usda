@@ -8,7 +8,7 @@
             }
             dictionary Perspective = {
                 double3 position = (0.40973424888394017, 1.937909539741277, 0.7595238826797109)
-                double3 target = (0.5786803092460564, 1.2909837464738065, 0.6568495708366566)
+                double3 target = (0.5786803127006446, 1.290983733245548, 0.6568496598690993)
             }
             dictionary Right = {
                 double3 position = (0, -5, 0)
@@ -21,7 +21,7 @@
             string boundCamera = "/OmniverseKit_Persp"
         }
         dictionary omni_layer = {
-            string authoring_layer = "./franka_world.usda"
+            string authoring_layer = "./franka_multi_cam_world.usda"
             dictionary locked = {
                 bool "./props/camera.usda" = 1
                 bool "./props/looks.usd" = 0
@@ -35,6 +35,7 @@
             int "/persistent/simulation/minFrameRate" = 60
         }
         dictionary renderSettings = {
+            bool "rtx:ecoMode:enabled" = 0
         }
     }
     defaultPrim = "World"
@@ -100,9 +101,9 @@ def Xform "World"
         string semantic:Semantics_1Vc4:params:semanticData = "object"
         string semantic:Semantics_1Vc4:params:semanticType = "class"
         uniform token subdivisionScheme = "none"
-        quatd xformOp:orient = (1, 0, 0, 0)
+        quatd xformOp:orient = (6.123234262925839e-17, -6.123234262925839e-17, 1, -6.123234262925839e-17)
         double3 xformOp:scale = (0.05, 0.05, 0.05)
-        double3 xformOp:translate = (0.4, 0, 0.025)
+        double3 xformOp:translate = (0.29670652747154236, -0.07258643209934235, 0.48563170433044434)
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
     }
 
@@ -138,6 +139,149 @@ def Xform "World"
         double3 xformOp:scale = (0.1, 0.1, 0.1)
         double3 xformOp:translate = (0.8, 1.3, 0.7)
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "joints"
+        {
+            over "Base_fixed_joint"
+            {
+                quatd xformOp:orient = (1, -6.671202375817308e-17, 2.107342389479072e-8, 1.3645915185481552e-16)
+                double3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (-2.384185791015625e-7, 0, 0)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+            }
+        }
+
+        over "base_link"
+        {
+        }
+
+        over "dummy_z_link"
+        {
+        }
+
+        over "z_link"
+        {
+        }
+
+        over "y_link"
+        {
+        }
+    }
+
+    def Xform "Franka" (
+        prepend references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.0/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd@
+    )
+    {
+        quatd xformOp:orient = (1, 0, 0, 0)
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "panda_hand"
+        {
+            def Camera "gripper_camera" (
+                prepend apiSchemas = ["OmniLensDistortionFthetaAPI"]
+            )
+            {
+                float2 clippingRange = (0.01, 10000)
+                token omni:lensdistortion:model = "ftheta"
+                float verticalAperture = 20.955
+                token visibility = "invisible"
+                quatd xformOp:orient = (-0.08715574274765824, 0.9961946980917455, 0, -0)
+                double3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (0.1, 0, 0)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+            }
+
+            over "panda_finger_joint1"
+            {
+                float state:linear:physics:position = 0
+                float state:linear:physics:velocity = 0
+            }
+
+            over "panda_finger_joint2"
+            {
+                float state:linear:physics:position = 0
+                float state:linear:physics:velocity = 0
+            }
+        }
+
+        over "panda_link0"
+        {
+            over "panda_joint1"
+            {
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+        }
+
+        over "panda_link1"
+        {
+            over "panda_joint2"
+            {
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+        }
+
+        over "panda_link2"
+        {
+            over "panda_joint3"
+            {
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+        }
+
+        over "panda_link3"
+        {
+            over "panda_joint4"
+            {
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+        }
+
+        over "panda_link4"
+        {
+            over "panda_joint5"
+            {
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+        }
+
+        over "panda_link5"
+        {
+            over "panda_joint6"
+            {
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+        }
+
+        over "panda_link6"
+        {
+            over "panda_joint7"
+            {
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+        }
+
+        over "panda_link7"
+        {
+        }
+
+        over "panda_leftfinger"
+        {
+        }
+
+        over "panda_rightfinger" (
+            prepend apiSchemas = ["PhysxRigidBodyAPI"]
+        )
+        {
+            float physxRigidBody:sleepThreshold = 0
+        }
     }
 }
 
@@ -180,7 +324,7 @@ def PhysicsScene "physicsScene" (
     uniform token physxScene:broadphaseType = "MBP"
     bool physxScene:enableCCD = 1
     bool physxScene:enableGPUDynamics = 0
-    bool physxScene:enableStabilization = 1
+    bool physxScene:enableStabilization = 0
     uniform token physxScene:solverType = "TGS"
     uint physxScene:timeStepsPerSecond = 60
 }
@@ -216,6 +360,7 @@ def "Render" (
                 int omni:rtx:pt:mgpu:maxPixelsPerRegionExponent = 12
                 color3f omni:rtx:rt:ambientLight:color = (0.1, 0.1, 0.1)
                 bool omni:rtx:rt:demoire = 0
+                bool omni:rtx:rt:ecoMode:enabled = 0
                 bool omni:rtx:rt:lightcache:spatialCache:dontResolveConflicts = 1
                 bool omni:rtx:scene:hydra:materialSyncLoads = 1
                 bool omni:rtx:scene:hydra:mdlMaterialWarmup = 1
@@ -223,6 +368,64 @@ def "Render" (
                 rel orderedVars = </Render/Vars/LdrColor>
                 custom bool overrideClipRange = 0
                 uniform int2 resolution = (1280, 720)
+            }
+
+            def RenderProduct "Camera_5561_rp" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </World/camera/y_link/Camera>
+                token omni:rtx:background:source:texture:textureMode = "repeatMirrored"
+                token omni:rtx:background:source:type = "domeLight"
+                bool omni:rtx:dlss:frameGeneration = 0
+                string omni:rtx:material:db:rtSensorNameToIdMap = "DefaultMaterial:0;AsphaltStandardMaterial:1;AsphaltWeatheredMaterial:2;VegetationGrassMaterial:3;WaterStandardMaterial:4;GlassStandardMaterial:5;FiberGlassMaterial:6;MetalAlloyMaterial:7;MetalAluminumMaterial:8;MetalAluminumOxidizedMaterial:9;PlasticStandardMaterial:10;RetroMarkingsMaterial:11;RetroSignMaterial:12;RubberStandardMaterial:13;SoilClayMaterial:14;ConcreteRoughMaterial:15;ConcreteSmoothMaterial:16;OakTreeBarkMaterial:17;FabricStandardMaterial:18;PlexiGlassStandardMaterial:19;MetalSilverMaterial:20"
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:post:registeredCompositing:invertColorCorrection = 1
+                bool omni:rtx:post:registeredCompositing:invertToneMap = 1
+                bool omni:rtx:pt:lightcache:cached:dontResolveConflicts = 1
+                int omni:rtx:pt:maxSamplesPerLaunch = 2073600
+                int omni:rtx:pt:mgpu:maxPixelsPerRegionExponent = 12
+                color3f omni:rtx:rt:ambientLight:color = (0.1, 0.1, 0.1)
+                bool omni:rtx:rt:demoire = 0
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:rt:lightcache:spatialCache:dontResolveConflicts = 1
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                bool omni:rtx:scene:hydra:mdlMaterialWarmup = 1
+                uint omni:rtx:viewTile:limit = 4294967295
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (720, 720)
+            }
+
+            def RenderProduct "gripper_camera_5591_rp" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </World/Franka/panda_hand/gripper_camera>
+                token omni:rtx:background:source:texture:textureMode = "repeatMirrored"
+                token omni:rtx:background:source:type = "domeLight"
+                bool omni:rtx:dlss:frameGeneration = 0
+                string omni:rtx:material:db:rtSensorNameToIdMap = "DefaultMaterial:0;AsphaltStandardMaterial:1;AsphaltWeatheredMaterial:2;VegetationGrassMaterial:3;WaterStandardMaterial:4;GlassStandardMaterial:5;FiberGlassMaterial:6;MetalAlloyMaterial:7;MetalAluminumMaterial:8;MetalAluminumOxidizedMaterial:9;PlasticStandardMaterial:10;RetroMarkingsMaterial:11;RetroSignMaterial:12;RubberStandardMaterial:13;SoilClayMaterial:14;ConcreteRoughMaterial:15;ConcreteSmoothMaterial:16;OakTreeBarkMaterial:17;FabricStandardMaterial:18;PlexiGlassStandardMaterial:19;MetalSilverMaterial:20"
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:post:registeredCompositing:invertColorCorrection = 1
+                bool omni:rtx:post:registeredCompositing:invertToneMap = 1
+                bool omni:rtx:pt:lightcache:cached:dontResolveConflicts = 1
+                int omni:rtx:pt:maxSamplesPerLaunch = 2073600
+                int omni:rtx:pt:mgpu:maxPixelsPerRegionExponent = 12
+                color3f omni:rtx:rt:ambientLight:color = (0.1, 0.1, 0.1)
+                bool omni:rtx:rt:demoire = 0
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:rt:lightcache:spatialCache:dontResolveConflicts = 1
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                bool omni:rtx:scene:hydra:mdlMaterialWarmup = 1
+                uint omni:rtx:viewTile:limit = 4294967295
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (720, 720)
             }
         }
     }
@@ -232,7 +435,11 @@ def "Render" (
         no_delete = true
     )
     {
-        rel products = </Render/OmniverseKit/HydraTextures/omni_kit_widget_viewport_ViewportTexture_0>
+        rel products = [
+            </Render/OmniverseKit/HydraTextures/omni_kit_widget_viewport_ViewportTexture_0>,
+            </Render/OmniverseKit/HydraTextures/Camera_5561_rp>,
+            </Render/OmniverseKit/HydraTextures/gripper_camera_5591_rp>,
+        ]
     }
 
     def "Vars"
@@ -243,6 +450,18 @@ def "Render" (
         )
         {
             uniform string sourceName = "LdrColor"
+        }
+    }
+
+    over "PostProcess"
+    {
+        over "SDGPipeline"
+        {
+            over "DispatchSync"
+            {
+                custom bool inputs:enabled = 1
+                custom int2[] inputs:simTimesToWrite = [(3717, 10), (5576, 15), (11153, 30), (1859, 5), (2231, 6), (5578, 15), (3719, 10), (5579, 15), (11159, 30), (372, 1)]
+            }
         }
     }
 }

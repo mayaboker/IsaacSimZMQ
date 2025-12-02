@@ -30,4 +30,3 @@ message(STATUS "MSGPACK include: ${MSGPACK_INCLUDE_DIR}")
 message(STATUS "MSGPACK lib: ${MSGPACK_LIBRARY}")
 message(STATUS "OpenCV include: ${OpenCV_INCLUDE_DIRS}")
 message(STATUS "OpenCV libs: ${OpenCV_LIBS}")
-
