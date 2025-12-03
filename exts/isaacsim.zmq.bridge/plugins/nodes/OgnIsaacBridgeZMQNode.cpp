@@ -70,6 +70,8 @@ class OgnIsaacBridgeZMQNode {
     cudaStream_t m_cudaStream;
     bool m_cudaStreamNotCreated{ true };
     uint32_t m_zmqFailCount{ 0 };
+    bool m_useSimpleStream{ false };  // PUB/SUB with topic for simple viewers
+    std::string m_topic{ "camera/image" };
 
 public:
     OgnIsaacBridgeZMQNode()
@@ -97,28 +99,51 @@ public:
 
     static bool compute(OgnIsaacBridgeZMQNodeDatabase& db);
 
-    bool initializeSocket(uint32_t port, const std::string& ip) {
+    bool initializeSocket(uint32_t port, const std::string& ip, bool simpleStream) {
         std::lock_guard<std::mutex> lock(m_mutex);
 
         m_port = port;
         m_ip = ip;
         m_zmqFailCount = 0;
+        m_useSimpleStream = simpleStream;
+
+        // Get topic from env var
+        const char* topic_env = std::getenv("ISAAC_ZMQ_TOPIC");
+        if (topic_env) {
+            m_topic = std::string(topic_env);
+        }
 
         try {
-            m_zmqSocket = std::make_unique<zmq_lib::socket_t>(*m_zmqContext, zmq_lib::socket_type::push);
+            if (m_useSimpleStream) {
+                // PUB socket for simple streaming (binds, clients subscribe)
+                m_zmqSocket = std::make_unique<zmq_lib::socket_t>(*m_zmqContext, zmq_lib::socket_type::pub);
+                
+                int linger = 0;
+                m_zmqSocket->setsockopt(ZMQ_LINGER, &linger, sizeof(linger));
+                
+                int hwm = 1;
+                m_zmqSocket->setsockopt(ZMQ_SNDHWM, &hwm, sizeof(hwm));
+                
+                std::string address = "tcp://*:" + std::to_string(m_port);
+                m_zmqSocket->bind(address);
+                CARB_LOG_INFO("Simple stream: PUB socket bound to %s, topic: %s\n", address.c_str(), m_topic.c_str());
+            } else {
+                // PUSH socket for full streaming (connects to server)
+                m_zmqSocket = std::make_unique<zmq_lib::socket_t>(*m_zmqContext, zmq_lib::socket_type::push);
 
-            int linger = 0;
-            m_zmqSocket->setsockopt(ZMQ_LINGER, &linger, sizeof(linger));
+                int linger = 0;
+                m_zmqSocket->setsockopt(ZMQ_LINGER, &linger, sizeof(linger));
 
-            int hwm = 1;
-            m_zmqSocket->setsockopt(ZMQ_SNDHWM, &hwm, sizeof(hwm));
+                int hwm = 1;
+                m_zmqSocket->setsockopt(ZMQ_SNDHWM, &hwm, sizeof(hwm));
 
-            std::string address = "tcp://" + m_ip + ":" + std::to_string(m_port);
-            m_zmqSocket->connect(address);
-            CARB_LOG_INFO("Connected to %s\n", address.c_str());
+                std::string address = "tcp://" + m_ip + ":" + std::to_string(m_port);
+                m_zmqSocket->connect(address);
+                CARB_LOG_INFO("Full stream: PUSH socket connected to %s\n", address.c_str());
+            }
             return true;
         } catch (const std::exception& e) {
-            CARB_LOG_WARN("Failed to create socket or connect to %s:%d: %s", m_ip.c_str(), m_port, e.what());
+            CARB_LOG_WARN("Failed to create socket: %s", e.what());
             m_zmqSocket.reset();
             return false;
         }
@@ -139,9 +164,13 @@ bool OgnIsaacBridgeZMQNode::compute(OgnIsaacBridgeZMQNodeDatabase& db) {
     const omni::graph::core::ogn::const_string& ip = db.inputs.ip();
     std::string std_ip(ip.data(), ip.size());
 
+    // Check for simple stream mode (PUB/SUB with topic for simple viewers)
+    const char* simple_env = std::getenv("ISAAC_ZMQ_SIMPLE_STREAM");
+    bool simpleStream = simple_env && (std::string(simple_env) == "1" || std::string(simple_env) == "true");
+
     // If the socket is not initialized, or the port or IP address has changed, initialize the socket
     if (!state.m_zmqSocket || port != state.m_port || std_ip != state.m_ip) {
-        if (!state.initializeSocket(port, std_ip)) {
+        if (!state.initializeSocket(port, std_ip, simpleStream)) {
             return true;
         }
     }
@@ -370,17 +399,59 @@ bool OgnIsaacBridgeZMQNode::compute(OgnIsaacBridgeZMQNodeDatabase& db) {
     }
 
     // ZMQ Data sending
-    zmq_lib::message_t zmq_message(serialized_message.size());
-    memcpy(zmq_message.data(), serialized_message.data(), serialized_message.size());
-    auto message_sent = state.m_zmqSocket->send(zmq_message, zmq_lib::send_flags::dontwait);
+    bool message_sent_ok = false;
 
-    if (!message_sent.has_value()) {
+    if (state.m_useSimpleStream) {
+#if ISAACSIM_HAVE_MSGPACK
+        // Simple stream mode: PUB/SUB with topic and simple msgpack frame
+        // Send multipart: (TOPIC, msgpack-packed raw frame bytes)
+        try {
+            // Pack just the raw frame bytes (matching camera2zmq.cpp format)
+            msgpack::sbuffer sbuf_simple;
+            msgpack::packer<msgpack::sbuffer> pk_simple(&sbuf_simple);
+            
+            // Convert RGBA to BGR for OpenCV compatibility (like Gazebo example)
+            std::vector<unsigned char> bgr_frame(data_size_color * 3 / 4);  // RGB without alpha
+            const uint8_t* rgba = reinterpret_cast<const uint8_t*>(data_ptr_color.get());
+            for (size_t i = 0, j = 0; i < data_size_color; i += 4, j += 3) {
+                bgr_frame[j + 0] = rgba[i + 2];  // B
+                bgr_frame[j + 1] = rgba[i + 1];  // G
+                bgr_frame[j + 2] = rgba[i + 0];  // R
+            }
+            
+            pk_simple.pack(bgr_frame);
+
+            // Send topic
+            zmq_lib::message_t topic_msg(state.m_topic.size());
+            memcpy(topic_msg.data(), state.m_topic.c_str(), state.m_topic.size());
+            state.m_zmqSocket->send(topic_msg, zmq_lib::send_flags::sndmore | zmq_lib::send_flags::dontwait);
+
+            // Send data
+            zmq_lib::message_t data_msg(sbuf_simple.size());
+            memcpy(data_msg.data(), sbuf_simple.data(), sbuf_simple.size());
+            auto result = state.m_zmqSocket->send(data_msg, zmq_lib::send_flags::dontwait);
+            message_sent_ok = result.has_value();
+        } catch (const std::exception& e) {
+            CARB_LOG_WARN("Simple stream send failed: %s", e.what());
+        }
+#else
+        CARB_LOG_WARN("Simple stream requires msgpack support. Rebuild with msgpack.hpp available.");
+#endif
+    } else {
+        // Full stream mode: send complex protobuf/msgpack structure
+        zmq_lib::message_t zmq_message(serialized_message.size());
+        memcpy(zmq_message.data(), serialized_message.data(), serialized_message.size());
+        auto result = state.m_zmqSocket->send(zmq_message, zmq_lib::send_flags::dontwait);
+        message_sent_ok = result.has_value();
+    }
+
+    if (!message_sent_ok) {
         state.m_zmqFailCount++;
         double currentTime = db.inputs.systemTime();
         // Log the error state every 5 seconds,
         // and only if errors are accumulating.
         if (state.m_zmqFailCount > 20 && currentTime - lastErrorLogTime >= 5.0) {
-            CARB_LOG_ERROR("Failed to send message (no server available)");
+            CARB_LOG_ERROR("Failed to send message (no server/subscriber available)");
             lastErrorLogTime = currentTime;
         }
     } else {
