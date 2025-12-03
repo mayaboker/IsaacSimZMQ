@@ -181,14 +181,14 @@ class FrankaVisionMission(Mission):
             new_velocities = (float(j.get("x", 0)), float(j.get("y", 0)), float(j.get("z", 0)))
             focal_length = float(c.get("focal_length", self.cur_focal_length))
 
-        if focal_length != self.cur_focal_length:
-            try:
-                focalLength_attr = self._camera_prim.GetAttribute("focalLength")
-                focalLength_attr.Set(focal_length)
-                self.cur_focal_length = focal_length
-            except:
-                carb.log_warn(f"[{EXT_NAME}] Failed to set focal length")
-                pass
+            if focal_length != self.cur_focal_length:
+                try:
+                    focalLength_attr = self._camera_prim.GetAttribute("focalLength")
+                    focalLength_attr.Set(focal_length)
+                    self.cur_focal_length = focal_length
+                except:
+                    carb.log_warn(f"[{EXT_NAME}] Failed to set focal length")
+                    pass
 
         if self.world.is_playing():
             try:

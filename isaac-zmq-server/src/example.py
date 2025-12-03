@@ -309,65 +309,69 @@ class FrankaVisionMission(App):
         if not self.debug_start_time:
             self.debug_start_time = time.monotonic()
 
-        # Try to detect format: protobuf or msgpack
+        # Detect format by checking first byte (msgpack map markers)
+        # Msgpack fixmap: 0x80-0x8f, map16: 0xde, map32: 0xdf
         used_msgpack = False
         if not hasattr(self, "_decode_format_logged"):
             self._decode_format_logged = False
 
-        # Try protobuf first
-        protobuf_valid = False
-        try:
-            client_stream = client_stream_message_pb2.ClientStreamMessage()
-            client_stream.ParseFromString(message)
-            img_data = client_stream.color_image
-            # Check if we got valid data - if image is empty but message isn't, it's likely msgpack
-            if len(img_data) > 0 or len(message) < 100:
-                protobuf_valid = True
-                dt = client_stream.clock.sim_dt
-                sim_time = client_stream.clock.sim_time
-                timecode = client_stream.clock.sys_time
-                depth_data = client_stream.depth_image
-                bbox2d_data = self.proto_bbox_data_to_dict(client_stream.bbox2d)
-                camera_data = self.proto_camera_data_to_dict(client_stream.camera)
-        except Exception:
-            pass
+        first_byte = message[0] if message else 0
+        is_msgpack_map = (0x80 <= first_byte <= 0x8f) or first_byte in (0xde, 0xdf)
 
-        # If protobuf didn't give valid data, try msgpack
-        if not protobuf_valid:
-            if not msgpack:
-                print("[isaac-zmq-server] Protobuf parse gave empty data and msgpack is not available.")
-                return
+        if is_msgpack_map and msgpack:
+            # Try msgpack first
             try:
                 obj = msgpack.unpackb(message, raw=False)
                 used_msgpack = True
+                # Debug: print keys and sizes
+                if not hasattr(self, "_msgpack_debug_logged"):
+                    self._msgpack_debug_logged = True
+                    print(f"[isaac-zmq-server] msgpack keys: {list(obj.keys())}")
+                    ci = obj.get("color_image")
+                    print(f"[isaac-zmq-server] color_image type: {type(ci)}, len: {len(ci) if ci else 0}")
+
+                clk = obj.get("clock", {})
+                dt = float(clk.get("sim_dt", 0.0))
+                sim_time = float(clk.get("sim_time", 0.0))
+                timecode = float(clk.get("sys_time", 0.0))
+
+                img_data = obj.get("color_image", b"")
+                depth_data = obj.get("depth_image", b"")
+
+                bbox2d_data = obj.get("bbox2d", {"data": [], "info": {"bboxIds": [], "idToLabels": {}}})
+
+                cam = obj.get("camera", {})
+                view_flat = cam.get("view_matrix_ros", [])
+                intr_flat = cam.get("intrinsics_matrix", [])
+                scale_list = cam.get("camera_scale", [])
+
+                view_matrix_list = [view_flat[i : i + 4] for i in range(0, 16, 4)] if len(view_flat) == 16 else []
+                intrinsics_list = [intr_flat[i : i + 3] for i in range(0, 9, 3)] if len(intr_flat) == 9 else []
+                camera_data = {
+                    "view_matrix_ros": view_matrix_list,
+                    "camera_scale": list(scale_list),
+                    "intrinsics_matrix": intrinsics_list,
+                }
             except Exception:
                 print("[isaac-zmq-server] Failed to unpack message with msgpack.")
                 print(traceback.format_exc())
                 return
-
-            clk = obj.get("clock", {})
-            dt = float(clk.get("sim_dt", 0.0))
-            sim_time = float(clk.get("sim_time", 0.0))
-            timecode = float(clk.get("sys_time", 0.0))
-
-            img_data = obj.get("color_image", b"")
-            depth_data = obj.get("depth_image", b"")
-
-            bbox2d_data = obj.get("bbox2d", {"data": [], "info": {"bboxIds": [], "idToLabels": {}}})
-
-            cam = obj.get("camera", {})
-            # Normalize camera dict to expected shapes
-            view_flat = cam.get("view_matrix_ros", [])
-            intr_flat = cam.get("intrinsics_matrix", [])
-            scale_list = cam.get("camera_scale", [])
-
-            view_matrix_list = [view_flat[i : i + 4] for i in range(0, 16, 4)] if len(view_flat) == 16 else []
-            intrinsics_list = [intr_flat[i : i + 3] for i in range(0, 9, 3)] if len(intr_flat) == 9 else []
-            camera_data = {
-                "view_matrix_ros": view_matrix_list,
-                "camera_scale": list(scale_list),
-                "intrinsics_matrix": intrinsics_list,
-            }
+        else:
+            # Use protobuf
+            try:
+                client_stream = client_stream_message_pb2.ClientStreamMessage()
+                client_stream.ParseFromString(message)
+                dt = client_stream.clock.sim_dt
+                sim_time = client_stream.clock.sim_time
+                timecode = client_stream.clock.sys_time
+                img_data = client_stream.color_image
+                depth_data = client_stream.depth_image
+                bbox2d_data = self.proto_bbox_data_to_dict(client_stream.bbox2d)
+                camera_data = self.proto_camera_data_to_dict(client_stream.camera)
+            except Exception:
+                print("[isaac-zmq-server] Failed to parse protobuf message.")
+                print(traceback.format_exc())
+                return
 
         if not self._decode_format_logged:
             print(f"[isaac-zmq-server] Decode path: {'msgpack' if used_msgpack else 'protobuf'}")

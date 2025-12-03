@@ -107,7 +107,9 @@ class ZMQAnnotator:
         # in C++ mode we stream using the omniGraph nodes
         # in Python mode we stream in .stream() method in this class
         if self.use_ogn_nodes:
-            self.build_graph(name, camera)
+            # Extract actual render product name from path (includes _01 suffix added by system)
+            actual_rp_name = self.rp.split("/")[-1]
+            self.build_graph(actual_rp_name, camera)
         else:
             # Attache to Camera Prim for Python mode
             self.camera_xform = XFormPrim(camera)

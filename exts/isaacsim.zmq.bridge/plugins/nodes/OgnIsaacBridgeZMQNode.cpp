@@ -265,6 +265,12 @@ bool OgnIsaacBridgeZMQNode::compute(OgnIsaacBridgeZMQNodeDatabase& db) {
 
 #if ISAACSIM_HAVE_MSGPACK
     if (want_msgpack) {
+        static bool logged_once = false;
+        if (!logged_once) {
+            CARB_LOG_INFO("OgnIsaacBridgeZMQNode: Using MSGPACK serialization");
+            CARB_LOG_INFO("  color buffer size: %zu, depth buffer size: %zu", data_size_color, data_size_depth);
+            logged_once = true;
+        }
         try {
             msgpack::sbuffer sbuf;
             msgpack::packer<msgpack::sbuffer> pk(&sbuf);
