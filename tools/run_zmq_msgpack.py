@@ -60,7 +60,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--topic", type=str, default="camera/image",
                         help="MsgPack topic name")
     parser.add_argument("--headless", action="store_true",
-                        help="Run the headless launcher if available")
+                        help="Run without GUI (--no-window)")
+    parser.add_argument("--franka", action="store_true",
+                        help="Run the Franka example automatically (headless)")
     parser.add_argument("--extra", nargs=argparse.REMAINDER,
                         help="Additional arguments forwarded to the launcher")
     return parser.parse_args()
@@ -86,8 +88,16 @@ def main() -> int:
     cmd = [str(launcher), "--enable", "isaacsim.zmq.bridge.examples"]
 
     # Isaac Sim 5.0.0 uses --no-window for headless mode
-    if args.headless:
+    if args.headless or args.franka:
         cmd.append("--no-window")
+
+    # Run Franka example script
+    if args.franka:
+        franka_script = REPO_ROOT / "tools" / "run_franka_headless.py"
+        if not franka_script.exists():
+            print(f"[run_zmq_msgpack] Franka script not found: {franka_script}")
+            return 1
+        cmd.extend(["--exec", str(franka_script)])
 
     if args.extra:
         cmd.extend(args.extra)

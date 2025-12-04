@@ -27,7 +27,7 @@ def main():
         print("[run_franka_headless] Loading mission USD...")
         source_usd = FrankaVisionMission.mission_usd_path()
         print(f"[run_franka_headless] USD path: {source_usd}")
-        
+
         # Load the stage (no argument - method gets path internally)
         FrankaVisionMission.load_mission()
 
