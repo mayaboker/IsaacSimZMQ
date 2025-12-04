@@ -61,6 +61,8 @@ def parse_args() -> argparse.Namespace:
                         help="MsgPack topic name")
     parser.add_argument("--headless", action="store_true",
                         help="Run without GUI (--no-window)")
+    parser.add_argument("--gui", action="store_true",
+                        help="Run with GUI and auto-start streaming (requires --usd and --camera)")
     parser.add_argument("--franka", action="store_true",
                         help="Run the Franka example automatically (headless)")
     parser.add_argument("--extra", nargs=argparse.REMAINDER,
@@ -94,9 +96,13 @@ def main() -> int:
         # Run Franka example
         run_script = REPO_ROOT / "tools" / "run_franka_headless.py"
         args.headless = True  # Franka always runs headless
-    elif args.usd and args.camera and args.headless:
-        # Run generic streaming with custom USD/camera
-        run_script = REPO_ROOT / "tools" / "run_generic_headless.py"
+    elif args.usd and args.camera:
+        if args.headless:
+            # Run generic streaming headless
+            run_script = REPO_ROOT / "tools" / "run_generic_headless.py"
+        elif args.gui:
+            # Run generic streaming with GUI
+            run_script = REPO_ROOT / "tools" / "run_generic_gui.py"
 
     # Isaac Sim 5.0.0 uses --no-window for headless mode
     if args.headless:
