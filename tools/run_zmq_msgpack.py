@@ -37,7 +37,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).parent.parent
 
 # Default paths for Isaac Sim 5.0.0
-DEFAULT_LAUNCHER = Path("/opt/nvidia/isaac-sim/isaac-sim.sh")
+DEFAULT_LAUNCHER = Path("/home/user/isaacsim5.0/isaac-sim.sh")
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,17 +66,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_launcher(base: Path, headless: bool) -> Path:
+def resolve_launcher(base: Path) -> Path:
     launcher = base.expanduser().resolve()
-    if headless:
-        # Try to swap to isaac-sim-headless.sh beside the provided launcher
-        if "headless" not in launcher.name:
-            candidate = launcher.with_name("isaac-sim-headless.sh")
-            if candidate.exists():
-                launcher = candidate
-            else:
-                print(f"[run_zmq_msgpack] Warning: headless flag requested but {candidate} not found."
-                      " Using provided launcher instead.")
     if not launcher.exists():
         raise FileNotFoundError(f"Launcher not found: {launcher}")
     return launcher
@@ -86,7 +77,7 @@ def main() -> int:
     args = parse_args()
 
     try:
-        launcher = resolve_launcher(args.launcher, args.headless)
+        launcher = resolve_launcher(args.launcher)
     except FileNotFoundError as exc:
         print(exc)
         return 1
@@ -94,12 +85,16 @@ def main() -> int:
     # Build command
     cmd = [str(launcher), "--enable", "isaacsim.zmq.bridge.examples"]
     
+    # Isaac Sim 5.0.0 uses --no-window for headless mode
+    if args.headless:
+        cmd.append("--no-window")
+
     if args.extra:
         cmd.extend(args.extra)
 
     # Set environment variables for the streaming configuration
     env = os.environ.copy()
-    
+
     if args.usd:
         usd = args.usd.expanduser().resolve()
         if not usd.exists():
@@ -107,11 +102,11 @@ def main() -> int:
             return 1
         env["ISAAC_ZMQ_STAGE"] = str(usd)
         print(f"[run_zmq_msgpack] USD stage: {usd}")
-    
+
     if args.camera:
         env["ISAAC_ZMQ_CAMERA"] = args.camera
         print(f"[run_zmq_msgpack] Camera path: {args.camera}")
-    
+
     env["ISAAC_ZMQ_WIDTH"] = str(args.width)
     env["ISAAC_ZMQ_HEIGHT"] = str(args.height)
     env["ISAAC_ZMQ_PORT"] = str(args.port)
@@ -124,7 +119,7 @@ def main() -> int:
     print("[run_zmq_msgpack] TIP: For quick testing, use the built-in Franka example:")
     print("  Window > Examples > ZMQ Bridge > Franka")
     print()
-    
+
     try:
         return subprocess.call(cmd, env=env)
     except KeyboardInterrupt:
