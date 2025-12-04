@@ -2,12 +2,28 @@
 # SPDX-License-Identifier: MIT
 
 import asyncio
-import msgpack
 import numpy as np
 import zmq.asyncio
 
 import omni.replicator.core as rep
 from omni.replicator.core.scripts.utils import viewport_manager
+
+# Handle different msgpack versions/installations
+try:
+    import msgpack
+    if hasattr(msgpack, 'packb'):
+        _packb = msgpack.packb
+    elif hasattr(msgpack, 'dumps'):
+        _packb = msgpack.dumps
+    else:
+        raise ImportError("msgpack has no packb or dumps")
+except ImportError:
+    # Try msgpack_python or fallback
+    try:
+        import msgpack_python as msgpack
+        _packb = msgpack.packb
+    except ImportError:
+        raise ImportError("No working msgpack module found. Install with: pip install msgpack")
 
 
 class ZMQMsgpackAnnotator:
@@ -51,7 +67,7 @@ class ZMQMsgpackAnnotator:
         gray = (0.299 * rgb[..., 0] + 0.587 * rgb[..., 1] + 0.114 * rgb[..., 2]).astype(np.uint8)
         bgr = np.repeat(gray[..., None], 3, axis=2)
 
-        payload = msgpack.packb(bgr.tobytes(), use_bin_type=True)
+        payload = _packb(bgr.tobytes(), use_bin_type=True)
         await self._sock.send_multipart([self._topic, payload])
 
     def destroy(self):
