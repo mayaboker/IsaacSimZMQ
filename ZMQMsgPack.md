@@ -89,9 +89,9 @@ a subscriber is running on the **server side** to verify frames:
 
 ## 1. Use the Script Editor inside Isaac Sim
 
-1. Load the Franka example: **Create → Isaac ZMQ Examples → Franka RMPFlow**
+1. Open your USD stage that contains a camera.
 2. Open **Window → Script Editor**.
-3. Paste the snippet below and press **Run**.
+3. Paste the snippet below, adjust the camera path for your scene, and press **Run**.
 
 > **Note:** This uses `ZMQMsgpackAnnotator` which streams via PUB/SUB (simple stream mode).
 > Use `simple_msgpack_camera_gui.py` as the subscriber.
@@ -103,9 +103,9 @@ import omni.timeline
 
 from isaacsim.zmq.bridge.examples.core.ZMQMsgpackAnnotator import ZMQMsgpackAnnotator
 
-# Adjust camera path for your scene (this is for Franka example)
-CAMERA_PATH = "/World/camera/y_link/Camera"
-RESOLUTION = (720, 720)
+# Adjust camera path for your scene
+CAMERA_PATH = "/World/Camera"
+RESOLUTION = (1280, 720)
 ANNOTATOR_TOPIC = "camera/image"
 ZMQ_IP = "0.0.0.0"          # bind on all interfaces
 ZMQ_PORT = 5561
@@ -152,7 +152,7 @@ start()
 ```bash
 python simple_msgpack_camera_gui.py \
     --ip <ISAAC_SIM_HOST_IP> --port 5561 --topic camera/image \
-    --width 720 --height 720
+    --width 1280 --height 720
 ```
 
 (Press `ESC` to close the window.)
