@@ -1,7 +1,79 @@
 # ZMQ MsgPack Quickstart
 
-This note covers three common ways to stream camera frames from Isaac Sim to a
-MsgPack ZMQ subscriber using the new `ZMQMsgpackAnnotator`:
+This document covers how to stream camera frames from Isaac Sim using different
+serialization formats and ZMQ patterns.
+
+---
+
+## Streaming Modes Overview
+
+The ZMQ bridge supports three streaming modes, controlled by environment variables:
+
+| Isaac Sim Config | Streaming Format | Socket Pattern | Server Tester |
+|------------------|------------------|----------------|---------------|
+| `ISAAC_ZMQ_SERIALIZATION` unset or `protobuf` | Complex Protobuf structure | PUSH → PULL | `example.py` |
+| `ISAAC_ZMQ_SERIALIZATION=msgpack` | Complex MsgPack structure | PUSH → PULL | `example.py` |
+| `ISAAC_ZMQ_SERIALIZATION=msgpack` + `ISAAC_ZMQ_SIMPLE_STREAM=1` | Topic + Raw BGR Image | PUB → SUB | `simple_msgpack_camera_gui.py` |
+
+### Environment Variables
+
+| Variable | Values | Description |
+|----------|--------|-------------|
+| `ISAAC_ZMQ_SERIALIZATION` | `msgpack` / `protobuf` (default) | Serialization format |
+| `ISAAC_ZMQ_SIMPLE_STREAM` | `1` / `true` | Enable PUB/SUB mode for simple viewers |
+| `ISAAC_ZMQ_TOPIC` | string (default: `camera/image`) | Topic name for simple stream mode |
+
+### Data Formats
+
+**Complex structure (modes 1 & 2):**
+Contains full telemetry: `bbox2d`, `camera`, `clock`, `color_image`, `depth_image`
+
+**Simple stream (mode 3):**
+Multipart ZMQ message: `(topic, msgpack-packed BGR frame bytes)`
+Matches Gazebo `camera2zmq.cpp` pattern for compatibility with existing viewers.
+
+### Socket Patterns
+
+**Modes 1 & 2 (PUSH/PULL):**
+- Isaac Sim **connects** (PUSH socket) to server
+- Server **binds** (PULL socket) on port
+
+**Mode 3 - Simple Stream (PUB/SUB):**
+- Isaac Sim **binds** (PUB socket) on port
+- Viewer **connects** (SUB socket) to Isaac Sim
+
+### Quick Start Examples
+
+**Mode 1 - Protobuf (default):**
+```bash
+# No env vars needed, just start Isaac Sim
+# Server:
+python example.py
+```
+
+**Mode 2 - MsgPack with full structure:**
+```bash
+export ISAAC_ZMQ_SERIALIZATION=msgpack
+# Start Isaac Sim
+# Server:
+python example.py
+```
+
+**Mode 3 - Simple stream for camera viewers:**
+```bash
+export ISAAC_ZMQ_SERIALIZATION=msgpack
+export ISAAC_ZMQ_SIMPLE_STREAM=1
+# Start Isaac Sim, load scene, start streaming
+# Viewer:
+python simple_msgpack_camera_gui.py --ip 127.0.0.1 --port 5561 --topic camera/image --width 720 --height 720
+```
+
+---
+
+## ZMQMsgpackAnnotator (Script Editor Method)
+
+This section covers using the `ZMQMsgpackAnnotator` class directly for custom
+streaming scenarios:
 
 1. Launch Isaac Sim normally and paste a small helper into the Script Editor.
 2. Start Isaac Sim from the command line with a utility script.
