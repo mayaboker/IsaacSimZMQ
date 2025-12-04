@@ -89,7 +89,7 @@ def main() -> int:
 
     # Determine which script to run
     run_script = None
-    
+
     if args.franka:
         # Run Franka example
         run_script = REPO_ROOT / "tools" / "run_franka_headless.py"

@@ -80,8 +80,10 @@ streaming scenarios:
 3. Drive the same flow in headless mode.
 
 The examples below assume you already built the project (`./build.sh`) and that
-a subscriber is running on the **server side** to verify frames. You can use
-`simple_msgpack_camera_gui.py` from the `isaac-zmq-server/src/` directory.
+a subscriber is running on the **server side** to verify frames:
+
+- **Complex stream** (PUSH/PULL): Use `example.py` from `isaac-zmq-server/src/`
+- **Simple stream** (PUB/SUB): Use `simple_msgpack_camera_gui.py` from `isaac-zmq-server/src/`
 
 ---
 
