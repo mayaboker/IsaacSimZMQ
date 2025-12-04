@@ -84,7 +84,7 @@ def main() -> int:
 
     # Build command
     cmd = [str(launcher), "--enable", "isaacsim.zmq.bridge.examples"]
-    
+
     # Isaac Sim 5.0.0 uses --no-window for headless mode
     if args.headless:
         cmd.append("--no-window")
