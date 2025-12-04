@@ -89,10 +89,12 @@ a subscriber is running on the **server side** to verify frames:
 
 ## 1. Use the Script Editor inside Isaac Sim
 
-1. Open the stage that contains your camera (e.g. `/home/user/omniverse/is40/zmq-turtle-rate-camera.usd`).
+1. Load the Franka example: **Create → Isaac ZMQ Examples → Franka RMPFlow**
 2. Open **Window → Script Editor**.
-3. Paste the snippet below, adjust the camera path, resolution, topic, etc., and
-   press **Run**.
+3. Paste the snippet below and press **Run**.
+
+> **Note:** This uses `ZMQMsgpackAnnotator` which streams via PUB/SUB (simple stream mode).
+> Use `simple_msgpack_camera_gui.py` as the subscriber.
 
 ```python
 import asyncio
@@ -101,8 +103,9 @@ import omni.timeline
 
 from isaacsim.zmq.bridge.examples.core.ZMQMsgpackAnnotator import ZMQMsgpackAnnotator
 
-CAMERA_PATH = "/World/turtlebot3_burger/base_link/car_camera"
-RESOLUTION = (1280, 720)
+# Adjust camera path for your scene (this is for Franka example)
+CAMERA_PATH = "/World/camera/y_link/Camera"
+RESOLUTION = (720, 720)
 ANNOTATOR_TOPIC = "camera/image"
 ZMQ_IP = "0.0.0.0"          # bind on all interfaces
 ZMQ_PORT = 5561
@@ -144,12 +147,12 @@ start()
 
 4. Press **Play** on the timeline. Frames are now emitted on `tcp://0.0.0.0:5561`
    with topic `camera/image`.
-5. Run the viewer (from the repo root) to confirm:
+5. Run the viewer (in server container) to confirm:
 
 ```bash
-python isaac-zmq-server/src/simple_msgpack_camera_gui.py \
-    --ip 127.0.0.1 --port 5561 --topic camera/image \
-    --width 1280 --height 720
+python simple_msgpack_camera_gui.py \
+    --ip <ISAAC_SIM_HOST_IP> --port 5561 --topic camera/image \
+    --width 720 --height 720
 ```
 
 (Press `ESC` to close the window.)
