@@ -87,17 +87,27 @@ def main() -> int:
     # Build command
     cmd = [str(launcher), "--enable", "isaacsim.zmq.bridge.examples"]
 
+    # Determine which script to run
+    run_script = None
+    
+    if args.franka:
+        # Run Franka example
+        run_script = REPO_ROOT / "tools" / "run_franka_headless.py"
+        args.headless = True  # Franka always runs headless
+    elif args.usd and args.camera and args.headless:
+        # Run generic streaming with custom USD/camera
+        run_script = REPO_ROOT / "tools" / "run_generic_headless.py"
+
     # Isaac Sim 5.0.0 uses --no-window for headless mode
-    if args.headless or args.franka:
+    if args.headless:
         cmd.append("--no-window")
 
-    # Run Franka example script
-    if args.franka:
-        franka_script = REPO_ROOT / "tools" / "run_franka_headless.py"
-        if not franka_script.exists():
-            print(f"[run_zmq_msgpack] Franka script not found: {franka_script}")
+    # Add exec script if specified
+    if run_script:
+        if not run_script.exists():
+            print(f"[run_zmq_msgpack] Script not found: {run_script}")
             return 1
-        cmd.extend(["--exec", str(franka_script)])
+        cmd.extend(["--exec", str(run_script)])
 
     if args.extra:
         cmd.extend(args.extra)
