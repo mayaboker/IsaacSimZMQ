@@ -87,7 +87,7 @@ def main() -> int:
         return 1
 
     # Build command - enable both the base extension and examples
-    cmd = [str(launcher), 
+    cmd = [str(launcher),
            "--enable", "isaacsim.zmq.bridge",
            "--enable", "isaacsim.zmq.bridge.examples"]
 

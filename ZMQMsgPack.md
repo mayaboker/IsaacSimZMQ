@@ -263,21 +263,27 @@ python simple_msgpack_camera_gui.py \
 
 ## Subscribers and Debugging
 
-Two simple clients are included under `isaac-zmq-server/src/`:
+Several clients are included under `isaac-zmq-server/src/`:
 
-- `simple_msgpack_camera_gui.py` — DearPyGui viewer (no OpenCV dependencies).
-- `msgpack_camera_sub.py` — OpenCV-based script (requires an X/Qt environment).
+| Client | Socket | Format | Description |
+|--------|--------|--------|-------------|
+| `example.py` | PULL | Protobuf or Complex MsgPack | Full-featured GUI with robot control |
+| `simple_msgpack_camera_gui.py` | SUB | Simple MsgPack (Topic + BGR) | Lightweight DearPyGui viewer |
+| `msgpack_camera_sub.py` | SUB | Simple MsgPack | OpenCV-based viewer |
 
-Example GUI viewer usage:
-
+**For complex stream (PUSH/PULL):**
+```bash
+python isaac-zmq-server/src/example.py
 ```
+Works with both `ISAAC_ZMQ_SERIALIZATION=protobuf` and `ISAAC_ZMQ_SERIALIZATION=msgpack`.
+
+**For simple stream (PUB/SUB):**
+```bash
 python isaac-zmq-server/src/simple_msgpack_camera_gui.py \
-    --ip 127.0.0.1 --port 5561 --topic camera/image \
+    --ip <ISAAC_SIM_HOST_IP> --port 5561 --topic camera/image \
     --width 1280 --height 720
 ```
-
-If you prefer the OpenCV script, run it on a machine with a GUI stack (or use a
-headless OpenCV build and save frames to disk).
+Requires `ISAAC_ZMQ_SIMPLE_STREAM=1` on the Isaac Sim side.
 
 ---
 
