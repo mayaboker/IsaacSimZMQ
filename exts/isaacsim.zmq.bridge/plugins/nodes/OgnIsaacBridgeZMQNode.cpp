@@ -117,13 +117,13 @@ public:
             if (m_useSimpleStream) {
                 // PUB socket for simple streaming (binds, clients subscribe)
                 m_zmqSocket = std::make_unique<zmq_lib::socket_t>(*m_zmqContext, zmq_lib::socket_type::pub);
-                
+
                 int linger = 0;
                 m_zmqSocket->setsockopt(ZMQ_LINGER, &linger, sizeof(linger));
-                
+
                 int hwm = 1;
                 m_zmqSocket->setsockopt(ZMQ_SNDHWM, &hwm, sizeof(hwm));
-                
+
                 std::string address = "tcp://*:" + std::to_string(m_port);
                 m_zmqSocket->bind(address);
                 CARB_LOG_INFO("Simple stream: PUB socket bound to %s, topic: %s\n", address.c_str(), m_topic.c_str());
@@ -409,7 +409,7 @@ bool OgnIsaacBridgeZMQNode::compute(OgnIsaacBridgeZMQNodeDatabase& db) {
             // Pack just the raw frame bytes (matching camera2zmq.cpp format)
             msgpack::sbuffer sbuf_simple;
             msgpack::packer<msgpack::sbuffer> pk_simple(&sbuf_simple);
-            
+
             // Convert RGBA to BGR for OpenCV compatibility (like Gazebo example)
             std::vector<unsigned char> bgr_frame(data_size_color * 3 / 4);  // RGB without alpha
             const uint8_t* rgba = reinterpret_cast<const uint8_t*>(data_ptr_color.get());
@@ -418,7 +418,7 @@ bool OgnIsaacBridgeZMQNode::compute(OgnIsaacBridgeZMQNodeDatabase& db) {
                 bgr_frame[j + 1] = rgba[i + 1];  // G
                 bgr_frame[j + 2] = rgba[i + 0];  // R
             }
-            
+
             pk_simple.pack(bgr_frame);
 
             // Send topic
