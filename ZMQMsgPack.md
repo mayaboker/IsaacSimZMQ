@@ -192,55 +192,72 @@ python isaac-zmq-server/src/simple_msgpack_camera_gui.py \
 ## 3. Launch Isaac Sim with a helper script
 
 A convenience launcher is provided at `tools/run_zmq_msgpack.py` for custom USD
-stages. It enables the ZMQ bridge extension and can optionally load a USD file.
+stages or the Franka example. It enables the ZMQ bridge extension and auto-starts streaming.
 
-**Basic launch (uses Franka example):**
-```bash
-python tools/run_zmq_msgpack.py
-```
+**Available modes:**
 
-**Launch with a custom USD stage:**
-```bash
-python tools/run_zmq_msgpack.py --usd /path/to/your/stage.usd
-```
+| Mode | Command | Description |
+|------|---------|-------------|
+| GUI + custom USD | `--gui --usd X --camera Y` | Opens Isaac Sim with GUI, loads USD, starts streaming |
+| Headless + custom USD | `--headless --usd X --camera Y` | No GUI, loads USD, starts streaming |
+| Headless + Franka | `--franka` | No GUI, loads Franka example, starts streaming |
+| Basic launch | (no flags) | Just opens Isaac Sim with extension enabled |
 
 **Available options:**
 
 | Option | Description |
 |--------|-------------|
+| `--gui` | Run with GUI and auto-start streaming (requires `--usd` and `--camera`) |
+| `--headless` | Run without GUI (requires `--usd` and `--camera`) |
+| `--franka` | Run the Franka example (headless) |
 | `--usd PATH` | USD stage to load |
 | `--camera PATH` | Camera prim path (e.g., `/World/Camera`) |
 | `--width N` | Camera resolution width (default: 720) |
 | `--height N` | Camera resolution height (default: 720) |
 | `--port N` | ZMQ port (default: 5561) |
 | `--topic NAME` | MsgPack topic (default: `camera/image`) |
-| `--headless` | Run without GUI |
 | `--launcher PATH` | Override Isaac Sim launcher path |
 | `--extra ...` | Additional arguments for the launcher |
 
-**Example with custom camera:**
+---
+
+## 4. Examples
+
+**GUI mode with custom USD:**
 ```bash
-python tools/run_zmq_msgpack.py \
+export ISAAC_ZMQ_SERIALIZATION=msgpack
+export ISAAC_ZMQ_SIMPLE_STREAM=1
+
+python tools/run_zmq_msgpack.py --gui \
     --usd /path/to/scene.usd \
-    --camera /World/MyCamera \
+    --camera /World/Camera \
     --width 1280 --height 720
 ```
 
----
-
-## 4. Headless mode
-
-Add `--headless` to run without a GUI:
-
+**Headless mode with custom USD:**
 ```bash
-python tools/run_zmq_msgpack.py \
-    --headless \
+export ISAAC_ZMQ_SERIALIZATION=msgpack
+export ISAAC_ZMQ_SIMPLE_STREAM=1
+
+python tools/run_zmq_msgpack.py --headless \
     --usd /path/to/scene.usd \
     --camera /World/Camera
 ```
 
-In headless mode, streaming works exactly as in GUI mode. Use the same viewer
-commands to monitor frames.
+**Franka example (headless):**
+```bash
+export ISAAC_ZMQ_SERIALIZATION=msgpack
+export ISAAC_ZMQ_SIMPLE_STREAM=1
+
+python tools/run_zmq_msgpack.py --franka
+```
+
+**Viewer (in server container):**
+```bash
+python simple_msgpack_camera_gui.py \
+    --ip <ISAAC_SIM_HOST_IP> --port 5561 --topic camera/image \
+    --width 1280 --height 720
+```
 
 ---
 
