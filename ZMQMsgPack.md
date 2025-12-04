@@ -171,7 +171,7 @@ export ISAAC_ZMQ_SIMPLE_STREAM=1  # Optional: for simple PUB/SUB mode
 ```
 
 **In Isaac Sim:**
-1. Go to **Window → Examples → ZMQ Bridge → Franka**
+1. Go to **Create → Isaac ZMQ Examples → Franka RMPFlow**
 2. Click **"Reset World"**
 3. Click **"Start Streaming"**
 

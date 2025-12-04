@@ -127,7 +127,7 @@ def main() -> int:
     print(f"[run_zmq_msgpack] Port: {args.port}, Topic: {args.topic}")
     print()
     print("[run_zmq_msgpack] TIP: For quick testing, use the built-in Franka example:")
-    print("  Window > Examples > ZMQ Bridge > Franka")
+    print("  Create > Isaac ZMQ Examples > Franka RMPFlow")
     print()
 
     try:
