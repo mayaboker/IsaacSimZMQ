@@ -157,46 +157,85 @@ Sim.
 
 ---
 
-## 2. Launch Isaac Sim with a helper script
+## 2. Using the Built-in Franka Example (Recommended)
 
-A convenience launcher is provided at `tools/run_zmq_msgpack.py`. It wraps the
-usual Isaac Sim startup flags, loads a USD stage, and executes a helper Python
-script from the repo.
+The easiest way to test ZMQ streaming is with the built-in Franka robot example:
 
+**Setup:**
+```bash
+# Set environment variables for your desired streaming mode
+export ISAAC_ZMQ_SERIALIZATION=msgpack
+export ISAAC_ZMQ_SIMPLE_STREAM=1  # Optional: for simple PUB/SUB mode
+
+# Start Isaac Sim
 ```
-python tools/run_zmq_msgpack.py \
-    --usd /home/user/omniverse/is40/zmq-turtle-rate-camera.usd
+
+**In Isaac Sim:**
+1. Go to **Window → Examples → ZMQ Bridge → Franka**
+2. Click **"Reset World"**
+3. Click **"Start Streaming"**
+
+**Run the viewer:**
+```bash
+python isaac-zmq-server/src/simple_msgpack_camera_gui.py \
+    --ip 127.0.0.1 --port 5561 --topic camera/image \
+    --width 720 --height 720
 ```
-
-By default, it uses `exts/isaacsim.zmq.bridge.examples/isaacsim/zmq/bridge/examples/scripts/zmqpublish.py`.
-You can override with `--script` to use a different script (e.g., `zmqpublish_direct.py` for when the USD is already loaded).
-
-Useful options:
-
-- `--launcher` — override the default Isaac Sim launcher path.
-- `--headless` — automatically switch to headless mode if it exists.
-- `--extra ...` — forward additional arguments to the launcher (e.g. GPU options).
-
-Once the window appears, the USD stage is loaded and the script executes,
-instantiating the MsgPack annotator automatically. Use the same viewer command as
-above to monitor frames.
 
 ---
 
-## 3. Headless mode
+## 3. Launch Isaac Sim with a helper script
 
-The same launcher can start Isaac Sim without a GUI. Add `--headless` to switch
-to headless mode:
+A convenience launcher is provided at `tools/run_zmq_msgpack.py` for custom USD
+stages. It enables the ZMQ bridge extension and can optionally load a USD file.
 
+**Basic launch (uses Franka example):**
+```bash
+python tools/run_zmq_msgpack.py
 ```
+
+**Launch with a custom USD stage:**
+```bash
+python tools/run_zmq_msgpack.py --usd /path/to/your/stage.usd
+```
+
+**Available options:**
+
+| Option | Description |
+|--------|-------------|
+| `--usd PATH` | USD stage to load |
+| `--camera PATH` | Camera prim path (e.g., `/World/Camera`) |
+| `--width N` | Camera resolution width (default: 720) |
+| `--height N` | Camera resolution height (default: 720) |
+| `--port N` | ZMQ port (default: 5561) |
+| `--topic NAME` | MsgPack topic (default: `camera/image`) |
+| `--headless` | Run without GUI |
+| `--launcher PATH` | Override Isaac Sim launcher path |
+| `--extra ...` | Additional arguments for the launcher |
+
+**Example with custom camera:**
+```bash
+python tools/run_zmq_msgpack.py \
+    --usd /path/to/scene.usd \
+    --camera /World/MyCamera \
+    --width 1280 --height 720
+```
+
+---
+
+## 4. Headless mode
+
+Add `--headless` to run without a GUI:
+
+```bash
 python tools/run_zmq_msgpack.py \
     --headless \
-    --usd /home/user/omniverse/is40/zmq-turtle-rate-camera.usd
+    --usd /path/to/scene.usd \
+    --camera /World/Camera
 ```
 
-In headless mode the MsgPack annotator runs exactly as in the GUI case, so you
-can keep the same ZMQ subscriber. If you need to tweak simulation parameters or
-log information, edit the script in `exts/isaacsim.zmq.bridge.examples/isaacsim/zmq/bridge/examples/scripts/`.
+In headless mode, streaming works exactly as in GUI mode. Use the same viewer
+commands to monitor frames.
 
 ---
 
