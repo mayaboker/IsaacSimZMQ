@@ -9,12 +9,27 @@ the pose (x, y, z, roll, pitch, yaw) to a USD prim (typically a camera).
 """
 
 import asyncio
-import msgpack
 import zmq.asyncio
 import numpy as np
 from pxr import Usd, UsdGeom, Gf
 
 import carb
+
+# Handle different msgpack versions/installations
+try:
+    import msgpack
+    if hasattr(msgpack, 'unpackb'):
+        _unpackb = msgpack.unpackb
+    elif hasattr(msgpack, 'loads'):
+        _unpackb = msgpack.loads
+    else:
+        raise ImportError("msgpack has no unpackb or loads")
+except ImportError:
+    try:
+        import msgpack_python as msgpack
+        _unpackb = msgpack.unpackb
+    except ImportError:
+        raise ImportError("No working msgpack module found. Install with: pip install msgpack")
 
 
 class ZMQPoseSubscriber:
@@ -156,7 +171,7 @@ class ZMQPoseSubscriber:
 
                 # Unpack MsgPack message
                 try:
-                    data = msgpack.unpackb(payload, raw=False)
+                    data = _unpackb(payload, raw=False)
                 except Exception as e:
                     carb.log_error(f"ZMQPoseSubscriber: Failed to unpack message: {e}")
                     continue

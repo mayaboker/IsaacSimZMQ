@@ -30,7 +30,7 @@ from omni.isaac.core.utils import stage as stage_utils
 
 def main():
     print("[run_generic_headless] Starting generic camera streaming...")
-    
+
     # Read configuration from environment
     usd_path = os.getenv("ISAAC_ZMQ_STAGE")
     camera_path = os.getenv("ISAAC_ZMQ_CAMERA")
@@ -84,7 +84,7 @@ def main():
         # Import and create annotator
         from isaacsim.zmq.bridge.examples.core.annotators import ZMQAnnotator
         from isaacsim.zmq.bridge.examples.core.ZMQPoseSubscriber import ZMQPoseSubscriber
-        
+
         print("[run_generic_headless] Creating ZMQ annotator...")
         annotator = ZMQAnnotator(
             camera=camera_path,
@@ -93,7 +93,7 @@ def main():
             server_ip="localhost",
             port=port,
         )
-        
+
         # Create pose subscriber for camera control
         print(f"[run_generic_headless] Creating pose subscriber on {pose_ip}:{pose_port}, topic '{pose_topic}'...")
         pose_subscriber = ZMQPoseSubscriber(
@@ -102,14 +102,14 @@ def main():
             port=pose_port,
             topic=pose_topic,
         )
-        
+
         # Start timeline
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
-        
+
         # Start pose subscriber
         await pose_subscriber.start_async()
-        
+
         print("[run_generic_headless] Streaming started!")
         print(f"[run_generic_headless] Connect viewer with:")
         print(f"  python simple_msgpack_camera_gui.py --ip <HOST_IP> --port {port} --topic {topic} --width {width} --height {height}")
