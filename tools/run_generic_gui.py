@@ -29,7 +29,7 @@ from omni.isaac.core.utils import stage as stage_utils
 
 def main():
     print("[run_generic_gui] Starting generic camera streaming (GUI mode)...")
-
+    
     # Read configuration from environment
     usd_path = os.getenv("ISAAC_ZMQ_STAGE")
     camera_path = os.getenv("ISAAC_ZMQ_CAMERA")
@@ -37,6 +37,9 @@ def main():
     height = int(os.getenv("ISAAC_ZMQ_HEIGHT", "720"))
     port = int(os.getenv("ISAAC_ZMQ_PORT", "5561"))
     topic = os.getenv("ISAAC_ZMQ_TOPIC", "camera/image")
+    pose_port = int(os.getenv("ISAAC_ZMQ_POSE_PORT", "5562"))
+    pose_topic = os.getenv("ISAAC_ZMQ_POSE_TOPIC", "camera/pose")
+    pose_ip = os.getenv("ISAAC_ZMQ_POSE_IP", "localhost")
 
     if not usd_path:
         print("[run_generic_gui] ERROR: ISAAC_ZMQ_STAGE not set. Use --usd option.")
@@ -79,7 +82,8 @@ def main():
 
         # Import and create annotator
         from isaacsim.zmq.bridge.examples.core.annotators import ZMQAnnotator
-
+        from isaacsim.zmq.bridge.examples.core.ZMQPoseSubscriber import ZMQPoseSubscriber
+        
         print("[run_generic_gui] Creating ZMQ annotator...")
         annotator = ZMQAnnotator(
             camera=camera_path,
@@ -88,15 +92,28 @@ def main():
             server_ip="localhost",
             port=port,
         )
-
+        
+        # Create pose subscriber for camera control
+        print(f"[run_generic_gui] Creating pose subscriber on {pose_ip}:{pose_port}, topic '{pose_topic}'...")
+        pose_subscriber = ZMQPoseSubscriber(
+            prim_path=camera_path,
+            server_ip=pose_ip,
+            port=pose_port,
+            topic=pose_topic,
+        )
+        
         # Start timeline
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
-
+        
+        # Start pose subscriber
+        await pose_subscriber.start_async()
+        
         print("[run_generic_gui] ✓ Streaming started!")
         print(f"[run_generic_gui] Connect viewer with:")
         print(f"  python simple_msgpack_camera_gui.py --ip <HOST_IP> --port {port} --topic {topic} --width {width} --height {height}")
         print()
+        print(f"[run_generic_gui] Pose subscriber listening on {pose_ip}:{pose_port}, topic '{pose_topic}'")
         print("[run_generic_gui] Use the GUI normally. Close Isaac Sim to stop.")
 
     # Run the async setup

@@ -59,6 +59,12 @@ def parse_args() -> argparse.Namespace:
                         help="ZMQ port for streaming")
     parser.add_argument("--topic", type=str, default="camera/image",
                         help="MsgPack topic name")
+    parser.add_argument("--pose-port", type=int, default=5562,
+                        help="ZMQ port for pose subscriber")
+    parser.add_argument("--pose-topic", type=str, default="camera/pose",
+                        help="Topic for pose messages")
+    parser.add_argument("--pose-ip", type=str, default="localhost",
+                        help="IP of pose publisher (e.g., Gazebo machine)")
     parser.add_argument("--headless", action="store_true",
                         help="Run without GUI (--no-window)")
     parser.add_argument("--gui", action="store_true",
@@ -139,6 +145,9 @@ def main() -> int:
     env["ISAAC_ZMQ_HEIGHT"] = str(args.height)
     env["ISAAC_ZMQ_PORT"] = str(args.port)
     env["ISAAC_ZMQ_TOPIC"] = args.topic
+    env["ISAAC_ZMQ_POSE_PORT"] = str(args.pose_port)
+    env["ISAAC_ZMQ_POSE_TOPIC"] = args.pose_topic
+    env["ISAAC_ZMQ_POSE_IP"] = args.pose_ip
 
     print("[run_zmq_msgpack] Executing:\n  " + " ".join(cmd))
     print(f"[run_zmq_msgpack] Resolution: {args.width}x{args.height}")
