@@ -38,7 +38,10 @@ def main():
     height = int(os.getenv("ISAAC_ZMQ_HEIGHT", "720"))
     port = int(os.getenv("ISAAC_ZMQ_PORT", "5561"))
     topic = os.getenv("ISAAC_ZMQ_TOPIC", "camera/image")
-    pose_port = int(os.getenv("ISAAC_ZMQ_POSE_PORT", "5562"))
+    # Pose subscriber is optional - only if ISAAC_ZMQ_POSE_PORT is explicitly set
+    pose_port_str = os.getenv("ISAAC_ZMQ_POSE_PORT")
+    use_pose_subscriber = pose_port_str is not None
+    pose_port = int(pose_port_str) if pose_port_str else 5562
     pose_topic = os.getenv("ISAAC_ZMQ_POSE_TOPIC", "camera/pose")
     pose_ip = os.getenv("ISAAC_ZMQ_POSE_IP", "localhost")
 
@@ -83,7 +86,6 @@ def main():
 
         # Import and create annotator
         from isaacsim.zmq.bridge.examples.core.annotators import ZMQAnnotator
-        from isaacsim.zmq.bridge.examples.core.ZMQPoseSubscriber import ZMQPoseSubscriber
 
         print("[run_generic_headless] Creating ZMQ annotator...")
         annotator = ZMQAnnotator(
@@ -94,27 +96,30 @@ def main():
             port=port,
         )
 
-        # Create pose subscriber for camera control
-        print(f"[run_generic_headless] Creating pose subscriber on {pose_ip}:{pose_port}, topic '{pose_topic}'...")
-        pose_subscriber = ZMQPoseSubscriber(
-            prim_path=camera_path,
-            server_ip=pose_ip,
-            port=pose_port,
-            topic=pose_topic,
-        )
-
         # Start timeline
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
 
-        # Start pose subscriber
-        await pose_subscriber.start_async()
+        # Create pose subscriber only if requested
+        if use_pose_subscriber:
+            try:
+                from isaacsim.zmq.bridge.examples.core.ZMQPoseSubscriber import ZMQPoseSubscriber
+                print(f"[run_generic_headless] Creating pose subscriber on {pose_ip}:{pose_port}, topic '{pose_topic}'...")
+                pose_subscriber = ZMQPoseSubscriber(
+                    prim_path=camera_path,
+                    server_ip=pose_ip,
+                    port=pose_port,
+                    topic=pose_topic,
+                )
+                await pose_subscriber.start_async()
+                print(f"[run_generic_headless] Pose subscriber listening on {pose_ip}:{pose_port}, topic '{pose_topic}'")
+            except ImportError as e:
+                print(f"[run_generic_headless] WARNING: Pose subscriber unavailable: {e}")
+                print("[run_generic_headless] Install msgpack in Isaac Sim: /home/user/isaacsim5.0/python.sh -m pip install msgpack")
 
         print("[run_generic_headless] Streaming started!")
         print(f"[run_generic_headless] Connect viewer with:")
         print(f"  python simple_msgpack_camera_gui.py --ip <HOST_IP> --port {port} --topic {topic} --width {width} --height {height}")
-        print()
-        print(f"[run_generic_headless] Pose subscriber listening on {pose_ip}:{pose_port}, topic '{pose_topic}'")
         print("[run_generic_headless] Press Ctrl+C to stop.")
 
         # Keep running
