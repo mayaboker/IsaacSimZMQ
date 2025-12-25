@@ -1,0 +1,49 @@
+# Isaac Sim 5.0 + IsaacSimZMQ Extension
+# 
+# Build:
+#   docker build -f docker/Dockerfile.isaacsim -t isaacsim-zmq:5.0 .
+#
+# Run (GUI):
+#   xhost +local:docker
+#   docker run --rm -it --gpus all \
+#       -e DISPLAY=$DISPLAY \
+#       -v /tmp/.X11-unix:/tmp/.X11-unix \
+#       -v /path/to/your/usd:/data \
+#       isaacsim-zmq:5.0
+#
+# Run (Headless):
+#   docker run --rm -it --gpus all \
+#       -e ISAAC_ZMQ_SERIALIZATION=msgpack \
+#       -e ISAAC_ZMQ_SIMPLE_STREAM=1 \
+#       -v /path/to/your/usd:/data \
+#       isaacsim-zmq:5.0 --headless \
+#       --usd /data/scene.usd --camera /World/Camera
+
+FROM nvcr.io/nvidia/isaac-sim:4.5.0 AS base
+# Note: Update to isaac-sim:5.0.0 when available on NGC
+# Check: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/isaac-sim
+
+# Set working directory
+WORKDIR /isaac-sim
+
+# Copy the built extension
+COPY exts/isaacsim.zmq.bridge /isaac-sim/exts/isaacsim.zmq.bridge
+COPY exts/isaacsim.zmq.bridge.examples /isaac-sim/exts/isaacsim.zmq.bridge.examples
+
+# Copy launcher tools
+COPY tools /isaac-sim/tools
+
+# Copy assets (optional - for Franka example)
+COPY assets /isaac-sim/assets
+
+# Set environment variables
+ENV ISAAC_ZMQ_SERIALIZATION=msgpack
+ENV ISAAC_ZMQ_SIMPLE_STREAM=1
+
+# Enable extensions by default
+ENV OMNI_KIT_EXTENSIONS_ENABLED="isaacsim.zmq.bridge,isaacsim.zmq.bridge.examples"
+
+# Default entrypoint - can be overridden
+ENTRYPOINT ["/isaac-sim/isaac-sim.sh"]
+CMD ["--help"]
+

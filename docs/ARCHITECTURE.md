@@ -91,7 +91,7 @@ OmniGraph is Isaac Sim's **visual programming system**. Nodes are connected in a
         "version": 1,
         "description": "Streams camera data via ZMQ",
         "language": "C++",
-        
+
         "inputs": {
             "execIn": { "type": "execution" },
             "bufferPtr": { "type": "uint64" },
@@ -113,15 +113,15 @@ class OgnIsaacBridgeZMQNode {
 public:
     static bool compute(OgnIsaacBridgeZMQNodeDatabase& db) {
         // Called EVERY FRAME when node is triggered
-        
+
         // 1. Get inputs
         uint64_t bufferPtr = db.inputs.bufferPtr();
         int width = db.inputs.width();
-        
+
         // 2. Process (pack image, send via ZMQ)
         void* data = reinterpret_cast<void*>(bufferPtr);
         zmq_socket.send(data, width * height * 3);
-        
+
         // 3. Trigger output
         db.outputs.execOut() = kExecutionAttributeStateEnabled;
         return true;
@@ -158,12 +158,12 @@ def build_graph(self, name, camera):
         f"/Render/PostProcess/SDGPipeline/{name}_rp",
         "omni.graph.nodes.RenderProduct"
     )
-    
+
     zmq_node = og.Controller.create_node(
         f"/Render/PostProcess/SDGPipeline/zmq{self.port}",
         "isaacsim.zmq.bridge.IsaacBridgeZMQNode"  # ← References C++ node
     )
-    
+
     # Connect nodes
     render_product.get_attribute("outputs:buffer").connect(
         zmq_node.get_attribute("inputs:bufferPtr")
@@ -353,4 +353,3 @@ run_generic_gui.py reads env vars, loads USD, creates ZMQAnnotator
 | Change ZMQ ports | `--port`, `--pose-port` args |
 | Add new USD example | Create new mission in `example_missions.py` |
 | Modify Franka behavior | `example_missions.py` → `FrankaVisionMission` |
-
