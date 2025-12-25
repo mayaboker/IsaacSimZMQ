@@ -20,6 +20,9 @@ icon = "data/icon.png"
 [[python.module]]
 path = "pip_prebundle"
 
+[[python.module]]
+path = "pip_prebundle/msgpack"
+
 # Main python module this extension provides, it will be publicly available as "import lbenhorin.nvidia.vision_pipeline".
 [[python.module]]
 name = "isaacsim.zmq.bridge.examples"
