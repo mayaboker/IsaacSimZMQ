@@ -67,4 +67,3 @@ echo ""
 
 # Run
 eval $DOCKER_CMD
-

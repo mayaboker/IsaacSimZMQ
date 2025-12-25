@@ -1,5 +1,5 @@
 # Isaac Sim 5.0 + IsaacSimZMQ Extension
-# 
+#
 # Build:
 #   docker build -f docker/Dockerfile.isaacsim -t isaacsim-zmq:5.0 .
 #
@@ -46,4 +46,3 @@ ENV OMNI_KIT_EXTENSIONS_ENABLED="isaacsim.zmq.bridge,isaacsim.zmq.bridge.example
 # Default entrypoint - can be overridden
 ENTRYPOINT ["/isaac-sim/isaac-sim.sh"]
 CMD ["--help"]
-

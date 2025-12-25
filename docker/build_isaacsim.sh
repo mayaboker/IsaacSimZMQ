@@ -66,4 +66,3 @@ echo "      -v /path/to/usd:/data \\"
 echo "      ${IMAGE_NAME}:${IMAGE_TAG} \\"
 echo "      python tools/run_generic_headless.py"
 echo ""
-
