@@ -9,6 +9,16 @@ RUN apt-get update \
     && apt-get --no-install-recommends install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcb-render0 \
+    libxcb-shape0 \
+    libxcb-xfixes0 \
+    libxcb-xinerama0 \
+    libxkbcommon-x11-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
     python3 \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
