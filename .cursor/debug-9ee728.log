@@ -1,0 +1,3 @@
+{"sessionId": "9ee728", "runId": "pre-fix", "hypothesisId": "H1", "location": "msgpack_camera_viewer.py:40", "message": "viewer_start", "data": {"ip": "127.0.0.1", "port": 5561, "width": 720, "height": 720, "qt_qpa_platform": null, "display": ":1"}, "timestamp": 1776163818195}
+{"sessionId": "9ee728", "runId": "pre-fix", "hypothesisId": "H2", "location": "msgpack_camera_viewer.py:66", "message": "before_namedWindow", "data": {"window": "MsgPack Camera Viewer"}, "timestamp": 1776163818199}
+{"sessionId": "9ee728", "runId": "pre-fix", "hypothesisId": "H2", "location": "msgpack_camera_viewer.py:70", "message": "after_namedWindow", "data": {"status": "ok"}, "timestamp": 1776163818248}
