@@ -55,8 +55,11 @@ python example.py
 ```bash
 export ISAAC_ZMQ_SERIALIZATION=msgpack
 # Start Isaac Sim
-# Server:
-python example.py
+# Viewer / receiver:
+python isaac-zmq-server/src/msgpack_camera_viewer.py --ip 0.0.0.0 --port 5561 --width 720 --height 720
+#
+# Or use the full example server:
+python isaac-zmq-server/src/example.py
 ```
 
 **Mode 3 - Simple stream for camera viewers:**
@@ -216,14 +219,88 @@ stages or the Franka example. It enables the ZMQ bridge extension and auto-start
 | `--height N` | Camera resolution height (default: 720) |
 | `--port N` | ZMQ port (default: 5561) |
 | `--topic NAME` | MsgPack topic (default: `camera/image`) |
+| `--pose-port N` | ZMQ port Isaac Sim listens on for pose commands (default: `5562`) |
+| `--pose-topic NAME` | Topic for incoming pose commands (default: `camera/pose`) |
+| `--pose-ip HOST` | IP address of the external pose publisher Isaac Sim should connect to |
 | `--launcher PATH` | Override Isaac Sim launcher path |
 | `--extra ...` | Additional arguments for the launcher |
+
+### Port Mapping for `run_zmq_msgpack.py`
+
+The helper script configures two independent channels:
+
+- `--port`: the **image stream output** port from Isaac Sim
+- `--pose-port`: the **pose command input** port that Isaac Sim listens to
+
+For example:
+
+```bash
+python3 /home/user/IsaacSimZMQ/tools/run_zmq_msgpack.py \
+    --gui \
+    --usd /home/user/ov/is40-zmq.usd \
+    --camera /World/Camera \
+    --width 720 --height 720 \
+    --pose-port 5556 \
+    --pose-ip 10.0.0.16
+```
+
+means:
+
+- Isaac Sim publishes images on port `5561` because `--port` was not provided, so the default is used
+- Isaac Sim subscribes to pose commands on port `5556`
+- Isaac Sim expects the pose publisher to be running on host `10.0.0.16`
+
+The equivalent fully explicit command is:
+
+```bash
+python3 /home/user/IsaacSimZMQ/tools/run_zmq_msgpack.py \
+    --gui \
+    --usd /home/user/ov/is40-zmq.usd \
+    --camera /World/Camera \
+    --width 720 --height 720 \
+    --port 5561 \
+    --pose-port 5556 \
+    --pose-ip 10.0.0.16
+```
 
 ---
 
 ## 4. Examples
 
-**GUI mode with custom USD:**
+**GUI mode with custom USD (full MsgPack stream, PUSH/PULL):**
+```bash
+export ISAAC_ZMQ_SERIALIZATION=msgpack
+
+python tools/run_zmq_msgpack.py --gui \
+    --usd /path/to/scene.usd \
+    --camera /World/Camera \
+    --width 1280 --height 720
+```
+
+**Headless mode with custom USD (full MsgPack stream, PUSH/PULL):**
+```bash
+export ISAAC_ZMQ_SERIALIZATION=msgpack
+
+python tools/run_zmq_msgpack.py --headless \
+    --usd /path/to/scene.usd \
+    --camera /World/Camera
+```
+
+**Franka example (headless, full MsgPack stream):**
+```bash
+export ISAAC_ZMQ_SERIALIZATION=msgpack
+
+python tools/run_zmq_msgpack.py --franka
+```
+
+**Viewer for full MsgPack stream (in server container):**
+```bash
+python isaac-zmq-server/src/msgpack_camera_viewer.py \
+    --ip 0.0.0.0 --port 5561 \
+    --width 1280 --height 720
+```
+
+**Simple stream example (PUB/SUB):**
 ```bash
 export ISAAC_ZMQ_SERIALIZATION=msgpack
 export ISAAC_ZMQ_SIMPLE_STREAM=1
@@ -234,25 +311,7 @@ python tools/run_zmq_msgpack.py --gui \
     --width 1280 --height 720
 ```
 
-**Headless mode with custom USD:**
-```bash
-export ISAAC_ZMQ_SERIALIZATION=msgpack
-export ISAAC_ZMQ_SIMPLE_STREAM=1
-
-python tools/run_zmq_msgpack.py --headless \
-    --usd /path/to/scene.usd \
-    --camera /World/Camera
-```
-
-**Franka example (headless):**
-```bash
-export ISAAC_ZMQ_SERIALIZATION=msgpack
-export ISAAC_ZMQ_SIMPLE_STREAM=1
-
-python tools/run_zmq_msgpack.py --franka
-```
-
-**Viewer (in server container):**
+**Viewer for simple stream (PUB/SUB):**
 ```bash
 python simple_msgpack_camera_gui.py \
     --ip <ISAAC_SIM_HOST_IP> --port 5561 --topic camera/image \
@@ -268,14 +327,29 @@ Several clients are included under `isaac-zmq-server/src/`:
 | Client | Socket | Format | Description |
 |--------|--------|--------|-------------|
 | `example.py` | PULL | Protobuf or Complex MsgPack | Full-featured GUI with robot control |
+| `msgpack_camera_viewer.py` | PULL | Complex MsgPack | Lightweight OpenCV viewer for `run_zmq_msgpack.py --gui/--headless` |
 | `simple_msgpack_camera_gui.py` | SUB | Simple MsgPack (Topic + BGR) | Lightweight DearPyGui viewer |
 | `msgpack_camera_sub.py` | SUB | Simple MsgPack | OpenCV-based viewer |
 
 **For complex stream (PUSH/PULL):**
 ```bash
+python isaac-zmq-server/src/msgpack_camera_viewer.py \
+    --ip 0.0.0.0 --port 5561 \
+    --width 1280 --height 720
+```
+
+Alternative full-featured receiver:
+
+```bash
 python isaac-zmq-server/src/example.py
 ```
-Works with both `ISAAC_ZMQ_SERIALIZATION=protobuf` and `ISAAC_ZMQ_SERIALIZATION=msgpack`.
+
+`msgpack_camera_viewer.py` is appropriate when Isaac Sim is started with:
+
+- `ISAAC_ZMQ_SERIALIZATION=msgpack`
+- `ISAAC_ZMQ_SIMPLE_STREAM` unset
+
+It binds a `PULL` socket, so it is the matching receiver for the default `run_zmq_msgpack.py --gui` flow.
 
 **For simple stream (PUB/SUB):**
 ```bash
@@ -289,30 +363,36 @@ Requires `ISAAC_ZMQ_SIMPLE_STREAM=1` on the Isaac Sim side.
 
 ## Camera Pose Control
 
-The `zmqpublish.py` script automatically includes a **pose subscriber** that listens
-for camera pose commands via ZMQ/MsgPack. This allows external applications (e.g.,
-Gazebo plugins) to control the camera position and orientation in Isaac Sim.
+The helper launch flow (`tools/run_zmq_msgpack.py --gui ...`) automatically configures
+a **pose subscriber** inside Isaac Sim. This allows external applications (for example,
+Gazebo plugins or test scripts) to control the camera position and orientation via ZMQ/MsgPack.
 
 ### How It Works
 
-When you run `zmqpublish.py`, it automatically starts a `ZMQPoseSubscriber` that:
+When you run `tools/run_zmq_msgpack.py` with `--gui` or `--headless` and provide a
+USD stage plus camera path, the executed Isaac-side script starts a `ZMQPoseSubscriber` that:
 - Subscribes to pose messages on a configurable port (default: `5562`)
 - Receives pose data as `[x, y, z, roll, pitch, yaw]` or `{"x": ..., "y": ..., ...}`
 - Applies the pose to the camera prim in real-time
 
 ### Configuration
 
-Edit the pose subscriber settings in `zmqpublish.py`:
+These settings are controlled from the launcher command line:
 
-```python
-# Pose subscriber configuration
-POSE_SERVER_IP = "localhost"         # IP of the pose publisher
-POSE_PORT = 5562                     # Port for pose messages (use 5556 for Gazebo)
-POSE_TOPIC = "camera/pose"          # Topic for pose messages
+```bash
+python tools/run_zmq_msgpack.py --gui \
+    --usd /path/to/scene.usd \
+    --camera /World/Camera \
+    --pose-port 5556 \
+    --pose-ip 10.0.0.16 \
+    --pose-topic camera/pose
 ```
 
-**Note**: If using with a Gazebo plugin that publishes on port `5556`, change
-`POSE_PORT = 5556` in the script.
+This means:
+
+- Isaac Sim listens for pose commands on port `5556`
+- Isaac Sim connects to the pose publisher at `10.0.0.16`
+- Isaac Sim subscribes to topic `camera/pose`
 
 ### Using with Gazebo Plugin
 
@@ -320,8 +400,8 @@ The pose subscriber is compatible with Gazebo's `PublishPoseZMQPlugin` which
 publishes pose messages in the format `[x, y, z, roll, pitch, yaw]`.
 
 1. Ensure the Gazebo plugin is configured to publish on topic `camera/pose`
-2. Update `POSE_PORT` in `zmqpublish.py` to match the Gazebo plugin's port (default: `5556`)
-3. Set `POSE_SERVER_IP` to the IP address of the machine running Gazebo
+2. Set `--pose-port` to match the Gazebo plugin's port (often `5556`)
+3. Set `--pose-ip` to the IP address of the machine running Gazebo
 4. The camera will automatically move when Gazebo publishes pose updates
 
 ### Testing with pose_publisher.py
@@ -333,14 +413,14 @@ A test script is provided to manually publish pose commands:
 python isaac-zmq-server/src/pose_publisher.py \
     --x 1.0 --y 2.0 --z 3.0 \
     --roll 0.0 --pitch 0.5 --yaw 1.0 \
-    --port 5562 \
+    --port 5556 \
     --once
 
 # Publish continuously at 10 Hz
 python isaac-zmq-server/src/pose_publisher.py \
     --x 1.0 --y 2.0 --z 3.0 \
     --roll 0.0 --pitch 0.5 --yaw 1.0 \
-    --port 5562 \
+    --port 5556 \
     --rate 10.0
 ```
 
@@ -390,9 +470,11 @@ pose_subscriber.start()
 
 - Use the Script Editor for quick experiments (Section 1).
 - Use `tools/run_zmq_msgpack.py` to launch Isaac Sim with the MsgPack publisher
-  and your USD stage (Section 2).
+  and your USD stage (Section 3).
 - Add `--headless` to run without a GUI (Section 3).
-- Subscribe with either of the provided scripts to verify the stream.
+- For the default `run_zmq_msgpack.py --gui/--headless` flow, use `msgpack_camera_viewer.py`.
+- Use `simple_msgpack_camera_gui.py` only when `ISAAC_ZMQ_SIMPLE_STREAM=1` is enabled.
+- Treat `--port` and `--pose-port` as separate channels: image output vs pose input.
 
 The `ZMQMsgpackAnnotator` class is reusable—import it in your own missions or
 extensions whenever you need a Gazebo-style MsgPack feed from Isaac Sim.
