@@ -61,7 +61,7 @@ For headless workflows, GUI dependencies can be omitted.
 Choose a single stream mode and match receiver scripts accordingly:
 
 - Full stream (default): `ISAAC_ZMQ_SERIALIZATION=msgpack` and no `ISAAC_ZMQ_SIMPLE_STREAM`
-  - Isaac socket pattern: PUSH -> receiver must be PULL
+  - Isaac socket pattern: PUB -> receiver must be SUB
   - Typical receiver: `isaac-zmq-server/src/msgpack_camera_viewer.py`
 - Simple stream: `ISAAC_ZMQ_SERIALIZATION=msgpack` + `ISAAC_ZMQ_SIMPLE_STREAM=1`
   - Isaac socket pattern: PUB -> receiver must be SUB
@@ -77,6 +77,24 @@ Before first run on target machine:
 4. Run `./install.sh <ISAAC_SIM_PATH>` from extracted package.
 5. Launch with `./run.sh [<ISAAC_SIM_PATH>] ...` (generated inside package).
 6. Start matching receiver script for selected stream mode.
+
+### Optional: Pack and transfer Isaac Sim itself
+
+If Isaac Sim is not already installed on the target machine, you can archive your
+full Isaac Sim installation directory before transferring your project package:
+
+```bash
+cd /home/user/IsaacSimZMQ
+bash docker/pack_isaacsim.sh /home/user/isaacsim5.0 isaacsim-5.0-full.tar.gz
+```
+
+On the target machine:
+
+```bash
+tar -xzf isaacsim-5.0-full.tar.gz
+```
+
+Then install your project package using `./install.sh <ISAAC_SIM_PATH>`.
 
 ## 9. Notes for This Repository
 
