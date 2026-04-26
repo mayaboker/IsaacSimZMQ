@@ -47,8 +47,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--launcher", type=Path, default=DEFAULT_LAUNCHER,
                         help="Path to isaac-sim.sh (or headless variant)")
-    parser.add_argument("--usd", type=Path, default=None,
-                        help="USD stage to load (optional)")
+    parser.add_argument("--usd", type=str, default=None,
+                        help="USD stage to load (local path or omniverse:// URL)")
     parser.add_argument("--camera", type=str, default=None,
                         help="Camera prim path (e.g., /World/Camera)")
     parser.add_argument("--width", type=int, default=720,
@@ -130,12 +130,17 @@ def main() -> int:
     env = os.environ.copy()
 
     if args.usd:
-        usd = args.usd.expanduser().resolve()
-        if not usd.exists():
-            print(f"[run_zmq_msgpack] USD stage not found: {usd}")
-            return 1
-        env["ISAAC_ZMQ_STAGE"] = str(usd)
-        print(f"[run_zmq_msgpack] USD stage: {usd}")
+        usd_raw = args.usd.strip()
+        if usd_raw.startswith("omniverse://"):
+            env["ISAAC_ZMQ_STAGE"] = usd_raw
+            print(f"[run_zmq_msgpack] USD stage (Nucleus): {usd_raw}")
+        else:
+            usd = Path(usd_raw).expanduser().resolve()
+            if not usd.exists():
+                print(f"[run_zmq_msgpack] USD stage not found: {usd}")
+                return 1
+            env["ISAAC_ZMQ_STAGE"] = str(usd)
+            print(f"[run_zmq_msgpack] USD stage: {usd}")
 
     if args.camera:
         env["ISAAC_ZMQ_CAMERA"] = args.camera

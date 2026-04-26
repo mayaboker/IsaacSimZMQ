@@ -53,6 +53,11 @@ cp -r "${PROJECT_DIR}/exts/isaacsim.zmq.bridge.examples" "${PACK_DIR}/"
 # Copy tools
 cp -r "${PROJECT_DIR}/tools" "${PACK_DIR}/"
 
+# Copy server tools (viewer/test clients)
+if [ -d "${PROJECT_DIR}/isaac-zmq-server" ]; then
+    cp -r "${PROJECT_DIR}/isaac-zmq-server" "${PACK_DIR}/"
+fi
+
 # Copy assets
 cp -r "${PROJECT_DIR}/assets" "${PACK_DIR}/"
 
