@@ -25,6 +25,7 @@ A reference bridge implementation for bidirectional communication between NVIDIA
   - [Serialization](#serialization)
 - [Development](#development)
 - [Troubleshooting](#troubleshooting)
+- [Standalone Deployment Requirements](docs/STANDALONE_REQUIREMENTS.md)
 - [License](#license)
 
 ## Overview
@@ -55,6 +56,8 @@ The provided examples demonstrate:
 - [Isaac SIM 5.0.0 (Workstation or Container)](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/download.html)
 - Docker
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/index.html)
+- For standalone target-machine deployment (non-Docker package), see
+  [docs/STANDALONE_REQUIREMENTS.md](docs/STANDALONE_REQUIREMENTS.md)
 
 
 > The Isaac Sim 4.5 version of this extension is available [here](https://github.com/isaac-sim/IsaacSimZMQ/tree/isaac-sim-4.5.0).
