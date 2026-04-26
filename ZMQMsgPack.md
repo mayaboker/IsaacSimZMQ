@@ -51,12 +51,12 @@ Matches Gazebo `camera2zmq.cpp` pattern for compatibility with existing viewers.
 python example.py
 ```
 
-**Mode 2 - MsgPack with full structure:**
+**Mode 2 - MsgPack camera viewer flow (topic + msgpack image bytes):**
 ```bash
 export ISAAC_ZMQ_SERIALIZATION=msgpack
 # Start Isaac Sim
 # Viewer / receiver:
-python isaac-zmq-server/src/msgpack_camera_viewer.py --ip 0.0.0.0 --port 5561 --width 720 --height 720
+python isaac-zmq-server/src/msgpack_camera_viewer.py --ip 127.0.0.1 --port 5561 --topic camera/image --width 720 --height 720
 #
 # Or use the full example server:
 python isaac-zmq-server/src/example.py
@@ -267,7 +267,7 @@ python3 /home/user/IsaacSimZMQ/tools/run_zmq_msgpack.py \
 
 ## 4. Examples
 
-**GUI mode with custom USD (full MsgPack stream, PUSH/PULL):**
+**GUI mode with custom USD (MsgPack viewer flow, PUB/SUB):**
 ```bash
 export ISAAC_ZMQ_SERIALIZATION=msgpack
 
@@ -277,7 +277,7 @@ python tools/run_zmq_msgpack.py --gui \
     --width 1280 --height 720
 ```
 
-**Headless mode with custom USD (full MsgPack stream, PUSH/PULL):**
+**Headless mode with custom USD (MsgPack viewer flow, PUB/SUB):**
 ```bash
 export ISAAC_ZMQ_SERIALIZATION=msgpack
 
@@ -296,7 +296,7 @@ python tools/run_zmq_msgpack.py --franka
 **Viewer for full MsgPack stream (in server container):**
 ```bash
 python isaac-zmq-server/src/msgpack_camera_viewer.py \
-    --ip 0.0.0.0 --port 5561 \
+    --ip <ISAAC_SIM_HOST_IP> --port 5561 --topic camera/image \
     --width 1280 --height 720
 ```
 
@@ -327,14 +327,14 @@ Several clients are included under `isaac-zmq-server/src/`:
 | Client | Socket | Format | Description |
 |--------|--------|--------|-------------|
 | `example.py` | PULL | Protobuf or Complex MsgPack | Full-featured GUI with robot control |
-| `msgpack_camera_viewer.py` | PULL | Complex MsgPack | Lightweight OpenCV viewer for `run_zmq_msgpack.py --gui/--headless` |
+| `msgpack_camera_viewer.py` | SUB | Topic + MsgPack BGR bytes | Lightweight OpenCV viewer for `run_zmq_msgpack.py --gui/--headless` |
 | `simple_msgpack_camera_gui.py` | SUB | Simple MsgPack (Topic + BGR) | Lightweight DearPyGui viewer |
 | `msgpack_camera_sub.py` | SUB | Simple MsgPack | OpenCV-based viewer |
 
-**For complex stream (PUSH/PULL):**
+**For msgpack camera viewer flow (PUB/SUB):**
 ```bash
 python isaac-zmq-server/src/msgpack_camera_viewer.py \
-    --ip 0.0.0.0 --port 5561 \
+    --ip <ISAAC_SIM_HOST_IP> --port 5561 --topic camera/image \
     --width 1280 --height 720
 ```
 
@@ -349,7 +349,7 @@ python isaac-zmq-server/src/example.py
 - `ISAAC_ZMQ_SERIALIZATION=msgpack`
 - `ISAAC_ZMQ_SIMPLE_STREAM` unset
 
-It binds a `PULL` socket, so it is the matching receiver for the default `run_zmq_msgpack.py --gui` flow.
+It connects a `SUB` socket and subscribes by topic, matching the default `run_zmq_msgpack.py --gui/--headless` flow.
 
 **For simple stream (PUB/SUB):**
 ```bash

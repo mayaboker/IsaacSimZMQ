@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Simple MsgPack camera viewer using PULL socket.
-Compatible with Isaac Sim's OgnIsaacBridgeZMQNode (which uses PUSH socket).
+Simple MsgPack camera viewer using SUB socket.
+Compatible with the Isaac Sim msgpack pipeline that publishes multipart data:
+    [topic, msgpack-encoded image bytes]
 
 Usage:
     python msgpack_camera_viewer.py --ip 127.0.0.1 --port 5561 --width 720 --height 720
@@ -20,24 +21,28 @@ except ImportError:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="MsgPack Camera Viewer (PULL socket)")
-    parser.add_argument("--ip", type=str, default="127.0.0.1", help="IP address to bind to")
-    parser.add_argument("--port", type=int, default=5561, help="Port to bind to")
+    parser = argparse.ArgumentParser(description="MsgPack Camera Viewer (SUB socket)")
+    parser.add_argument("--ip", type=str, default="127.0.0.1", help="Publisher IP address to connect to")
+    parser.add_argument("--port", type=int, default=5561, help="Publisher port to connect to")
+    parser.add_argument("--topic", type=str, default="", help="Topic filter (empty subscribes to all topics)")
     parser.add_argument("--width", type=int, default=720, help="Image width")
     parser.add_argument("--height", type=int, default=720, help="Image height")
     args = parser.parse_args()
 
-    # Create ZMQ context and PULL socket
+    # Create ZMQ context and SUB socket
     ctx = zmq.Context()
-    sock = ctx.socket(zmq.PULL)
+    sock = ctx.socket(zmq.SUB)
+    sock.setsockopt(zmq.SUBSCRIBE, args.topic.encode("utf-8"))
 
-    # Bind to receive from PUSH socket
+    # Connect to publisher
     addr = f"tcp://{args.ip}:{args.port}"
-    sock.bind(addr)
-    print(f"[viewer] Bound PULL socket to {addr}")
-    print(f"[viewer] Waiting for frames (expected size: {args.width}x{args.height})...")
+    sock.connect(addr)
+    topic_label = args.topic if args.topic else "<all>"
+    print(f"[viewer] Connected SUB socket to {addr}")
+    print(f"[viewer] Subscribed topic: {topic_label}")
+    print(f"[viewer] Waiting for frames (expected size: {args.width}x{args.height}x3 BGR)...")
 
-    expected_size = args.width * args.height * 4  # RGBA
+    expected_size = args.width * args.height * 3  # BGR bytes
 
     cv2.namedWindow("MsgPack Camera Viewer", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("MsgPack Camera Viewer", args.width, args.height)
@@ -45,24 +50,12 @@ def main():
     frame_count = 0
     while True:
         try:
-            # Receive message (blocking)
-            message = sock.recv()
+            # Receive multipart message: [topic, msgpack_payload]
+            topic_msg, payload_msg = sock.recv_multipart()
+            topic = topic_msg.decode("utf-8", errors="replace")
 
-            # Check first byte to detect format
-            first_byte = message[0] if message else 0
-            is_msgpack = (0x80 <= first_byte <= 0x8f) or first_byte in (0xde, 0xdf)
-
-            if not is_msgpack:
-                if frame_count == 0:
-                    print("[viewer] Received protobuf data - this viewer only supports msgpack!")
-                    print("[viewer] Set ISAAC_ZMQ_SERIALIZATION=msgpack in Isaac Sim")
-                continue
-
-            # Unpack msgpack
-            obj = msgpack.unpackb(message, raw=False)
-
-            # Extract image data
-            img_data = obj.get("color_image", b"")
+            # Unpack msgpack payload (contains raw BGR bytes)
+            img_data = msgpack.unpackb(payload_msg, raw=False)
 
             if len(img_data) == 0:
                 if frame_count == 0:
@@ -74,18 +67,15 @@ def main():
                     print(f"[viewer] Image size mismatch: got {len(img_data)}, expected {expected_size}")
                 continue
 
-            # Convert to numpy array (RGBA format from Isaac Sim)
-            img = np.frombuffer(img_data, dtype=np.uint8).reshape(args.height, args.width, 4)
-
-            # Convert RGBA to BGR for OpenCV
-            img_bgr = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+            # Convert to numpy array (BGR format from publisher)
+            img_bgr = np.frombuffer(img_data, dtype=np.uint8).reshape(args.height, args.width, 3)
 
             # Display
             cv2.imshow("MsgPack Camera Viewer", img_bgr)
 
             frame_count += 1
             if frame_count == 1:
-                print(f"[viewer] Receiving frames! First frame size: {len(img_data)} bytes")
+                print(f"[viewer] Receiving frames on topic '{topic}'! First frame size: {len(img_data)} bytes")
 
             # Check for quit key
             key = cv2.waitKey(1) & 0xFF
