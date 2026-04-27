@@ -1,0 +1,36 @@
+# Lightweight server image (no Isaac Sim, no CUDA toolkit, no PyTorch).
+# Use this on standalone machines when the full Dockerfile (CUDA devel) is too heavy.
+#
+# Build:
+#   cd isaac-zmq-server && docker build -f Dockerfile.minimal -t isaac-zmq-server-minimal .
+#
+# Run shell:
+#   ./run_minimal.sh
+#
+# Run viewer:
+#   ./run_minimal.sh python /app/msgpack_camera_viewer.py --ip 0.0.0.0 --port 5561 --topic camera/image --width 720 --height 720
+
+FROM python:3.11-slim-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libgl1 \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender1 \
+        libxcb1 \
+        libxkbcommon0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir \
+    pyzmq==26.4.0 \
+    msgpack==1.0.8 \
+    opencv-python==4.10.0.84 \
+    protobuf==5.26.0
+
+COPY src/ /app/
+
+CMD ["bash"]
