@@ -1,0 +1,38 @@
+FROM ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG USER_NAME=builder
+ARG UID=1000
+ARG GID=1000
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    ca-certificates \
+    curl \
+    git \
+    build-essential \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3-dev \
+    pkg-config \
+    libmsgpack-dev \
+    unzip \
+    xz-utils \
+    tar \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create host-matching user/group to avoid "I have no name!" and root-owned files.
+RUN groupadd -g ${GID} ${USER_NAME} \
+    && useradd -m -u ${UID} -g ${GID} -s /bin/bash ${USER_NAME} \
+    && echo "${USER_NAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USER_NAME} \
+    && chmod 0440 /etc/sudoers.d/${USER_NAME}
+
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+USER ${USER_NAME}
+WORKDIR /workspace
+
+CMD ["/bin/bash"]
